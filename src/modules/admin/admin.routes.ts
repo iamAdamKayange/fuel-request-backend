@@ -6,6 +6,8 @@ import { validate } from '../../middleware/validation'
 import {
   registerUserSchema,
   updateUserStatusSchema,
+  updateAdminUserSchema,
+  deleteAdminUserSchema,
   resetPasswordSchema,
   adminUsersSchema,
 } from './admin.validation'
@@ -35,6 +37,10 @@ router.get('/users', validate(adminUsersSchema), adminController.getUsers)
  * @access Private - ADMIN only
  */
 router.get('/users/:id', adminController.getUserById)
+
+router.patch('/users/:id', validate(updateAdminUserSchema), adminController.updateUser)
+
+router.delete('/users/:id', validate(deleteAdminUserSchema), adminController.deleteUser)
 
 /**
  * @route PATCH /api/admin/users/:id/status

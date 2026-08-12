@@ -157,6 +157,82 @@ export class AdminService {
     return sanitizeUser(user)
   }
 
+  async updateUser(id: string, data: any) {
+    if (data.email) {
+      const existingUser = await prisma.user.findFirst({
+        where: {
+          email: data.email,
+          NOT: { id },
+        },
+      })
+
+      if (existingUser) {
+        throw new Error('Email is already in use')
+      }
+    }
+
+    const user = await prisma.user.update({
+      where: { id },
+      data: {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        phone: data.phone,
+        role: data.role as any,
+        departmentId: data.departmentId,
+        isActive: data.isActive,
+      },
+      include: { department: true },
+    })
+
+    await logAudit({
+      userId: id,
+      action: 'USER_UPDATED' as any,
+      description: `Admin updated user ${user.email}`,
+    })
+
+    return sanitizeUser(user)
+  }
+
+  async deleteUser(id: string) {
+    const user = await prisma.user.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: {
+            fuelRequests: true,
+            approvals: true,
+            fuelIssuances: true,
+            auditLogs: true,
+          },
+        },
+      },
+    })
+
+    if (!user) {
+      throw new Error('User not found')
+    }
+
+    const hasHistory = user._count.fuelRequests > 0 || user._count.approvals > 0 || user._count.fuelIssuances > 0 || user._count.auditLogs > 0
+
+    if (hasHistory) {
+      const deactivatedUser = await prisma.user.update({
+        where: { id },
+        data: { isActive: false },
+        include: { department: true },
+      })
+
+      return { deleted: false, deactivated: true, user: sanitizeUser(deactivatedUser) }
+    }
+
+    await prisma.refreshToken.deleteMany({ where: { userId: id } })
+    await prisma.deviceToken.deleteMany({ where: { userId: id } })
+    await prisma.notification.deleteMany({ where: { userId: id } })
+    await prisma.user.delete({ where: { id } })
+
+    return { deleted: true, deactivated: false }
+  }
+
   async resetPassword(id: string) {
     const user = await prisma.user.findUnique({
       where: { id },

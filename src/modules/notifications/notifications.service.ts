@@ -211,6 +211,23 @@ export class NotificationService {
 
     return { success: true }
   }
+
+  async deleteNotification(userId: string, notificationId: string) {
+    const notification = await prisma.notification.findUnique({
+      where: { id: notificationId },
+    })
+
+    if (!notification) throw new Error('Notification not found')
+    if (notification.userId !== userId) throw new Error('You can only delete your own notifications')
+
+    await prisma.notification.delete({ where: { id: notificationId } })
+    return { success: true }
+  }
+
+  async clearNotifications(userId: string) {
+    await prisma.notification.deleteMany({ where: { userId } })
+    return { success: true }
+  }
 }
 
 export const notificationService = NotificationService.getInstance()

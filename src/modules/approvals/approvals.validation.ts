@@ -8,7 +8,7 @@ export const headApprovalSchema = z.object({
     approved: z.boolean(),
     reason: z.string().optional(),
     designation: z.string().min(1, 'Designation is required'),
-    signature: z.string().min(1, 'Signature is required'),
+    signature: z.string().optional(),
   }).refine((data) => {
     if (!data.approved && !data.reason) {
       return false
@@ -31,7 +31,7 @@ export const transportApprovalSchema = z.object({
     logbookNumber: z.string().optional(),
     logbookTo: z.string().optional(),
     designation: z.string().min(1, 'Designation is required'),
-    signature: z.string().min(1, 'Signature is required'),
+    signature: z.string().optional(),
   }).refine((data) => {
     if (data.approved && !data.litresApproved) {
       return false
@@ -76,7 +76,7 @@ export const adaApprovalSchema = z.object({
     litresApproved: z.number().positive('Litres must be positive').optional(),
     reason: z.string().optional(),
     designation: z.string().min(1, 'Designation is required'),
-    signature: z.string().min(1, 'Signature is required'),
+    signature: z.string().optional(),
   }).refine((data) => {
     if (data.approved && !data.litresApproved) {
       return false

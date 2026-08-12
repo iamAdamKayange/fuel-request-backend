@@ -9,6 +9,6 @@ export const issueFuelSchema = z.object({
     litresIssued: z.number().positive('Litres must be positive'),
     tokenNumber: z.string().min(1, 'Token number is required'),
     designation: z.string().min(1, 'Designation is required'),
-    signature: z.string().min(1, 'Signature is required'),
+    signature: z.string().optional(),
   }),
 })

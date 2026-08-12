@@ -5,6 +5,7 @@ import { validate } from '../../middleware/validation'
 import {
   registerDeviceTokenSchema,
   markNotificationReadSchema,
+  deleteNotificationSchema,
   getNotificationsSchema,
 } from './notifications.validation'
 
@@ -64,6 +65,17 @@ router.patch(
 router.patch(
   '/read-all',
   notificationsController.markAllAsRead
+)
+
+router.delete(
+  '/',
+  notificationsController.clearNotifications
+)
+
+router.delete(
+  '/:id',
+  validate(deleteNotificationSchema),
+  notificationsController.deleteNotification
 )
 
 export default router

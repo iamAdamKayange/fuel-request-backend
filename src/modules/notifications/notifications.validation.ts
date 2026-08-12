@@ -9,7 +9,13 @@ export const registerDeviceTokenSchema = z.object({
 
 export const markNotificationReadSchema = z.object({
   params: z.object({
-    id: z.string().uuid('Invalid notification ID'),
+    id: z.string().min(1, 'Invalid notification ID'),
+  }),
+})
+
+export const deleteNotificationSchema = z.object({
+  params: z.object({
+    id: z.string().min(1, 'Invalid notification ID'),
   }),
 })
 

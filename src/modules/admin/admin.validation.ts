@@ -14,7 +14,7 @@ export const registerUserSchema = z.object({
 
 export const updateUserStatusSchema = z.object({
   params: z.object({
-    id: z.string().uuid('Invalid user ID'),
+    id: z.string().min(1, 'Invalid user ID'),
   }),
   body: z.object({
     isActive: z.boolean(),
@@ -23,7 +23,28 @@ export const updateUserStatusSchema = z.object({
 
 export const resetPasswordSchema = z.object({
   params: z.object({
-    id: z.string().uuid('Invalid user ID'),
+    id: z.string().min(1, 'Invalid user ID'),
+  }),
+})
+
+export const updateAdminUserSchema = z.object({
+  params: z.object({
+    id: z.string().min(1, 'Invalid user ID'),
+  }),
+  body: z.object({
+    firstName: z.string().min(1).optional(),
+    lastName: z.string().min(1).optional(),
+    email: z.string().email().optional(),
+    phone: z.string().optional().nullable(),
+    role: z.enum(['ADMIN', 'DRIVER', 'HEAD_OF_DEPARTMENT', 'TRANSPORT_OFFICER', 'ADA_DAHRM', 'PROCUREMENT']).optional(),
+    departmentId: z.string().optional().nullable(),
+    isActive: z.boolean().optional(),
+  }),
+})
+
+export const deleteAdminUserSchema = z.object({
+  params: z.object({
+    id: z.string().min(1, 'Invalid user ID'),
   }),
 })
 

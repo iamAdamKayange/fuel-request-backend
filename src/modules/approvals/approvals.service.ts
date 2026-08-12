@@ -62,7 +62,7 @@ export class ApprovalsService {
         approved: data.approved,
         reason: data.reason,
         designation: data.designation,
-        signature: data.signature,
+        signature: data.signature || approver.email,
       },
     })
 
@@ -187,7 +187,7 @@ export class ApprovalsService {
         logbookNumber: data.logbookNumber,
         logbookTo: data.logbookTo,
         designation: data.designation,
-        signature: data.signature,
+        signature: data.signature || approver.email,
       },
     })
 
@@ -314,7 +314,7 @@ export class ApprovalsService {
         reason: data.reason,
         litresApproved: data.litresApproved,
         designation: data.designation,
-        signature: data.signature,
+        signature: data.signature || approver.email,
       },
     })
 

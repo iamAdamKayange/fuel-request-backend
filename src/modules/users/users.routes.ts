@@ -7,6 +7,7 @@ import {
   getUsersSchema,
   getUserSchema,
   updateUserSchema,
+  updateProfileSchema,
   changePasswordSchema,
 } from './users.validation'
 
@@ -23,6 +24,30 @@ router.get(
   requireRole('ADMIN'),
   validate(getUsersSchema),
   usersController.getUsers
+)
+
+/**
+ * @route PUT /api/users/profile
+ * @description Update current user's profile
+ * @access Private
+ */
+router.put(
+  '/profile',
+  requireAuth,
+  validate(updateProfileSchema),
+  usersController.updateProfile
+)
+
+/**
+ * @route POST /api/users/change-password
+ * @description Change password
+ * @access Private
+ */
+router.post(
+  '/change-password',
+  requireAuth,
+  validate(changePasswordSchema),
+  usersController.changePassword
 )
 
 /**
@@ -48,18 +73,6 @@ router.put(
   requireRole('ADMIN'),
   validate(updateUserSchema),
   usersController.updateUser
-)
-
-/**
- * @route POST /api/users/change-password
- * @description Change password
- * @access Private
- */
-router.post(
-  '/change-password',
-  requireAuth,
-  validate(changePasswordSchema),
-  usersController.changePassword
 )
 
 export default router

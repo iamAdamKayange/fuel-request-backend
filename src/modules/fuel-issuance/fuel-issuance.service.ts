@@ -77,7 +77,7 @@ export class FuelIssuanceService {
         litresIssued: data.litresIssued,
         tokenNumber: data.tokenNumber,
         designation: data.designation,
-        signature: data.signature,
+        signature: data.signature || issuer.email,
       },
     })
 

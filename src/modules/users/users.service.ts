@@ -95,6 +95,42 @@ export class UsersService {
     return sanitizeUser(user)
   }
 
+  async updateProfile(userId: string, data: any) {
+    if (data.email) {
+      const existingUser = await prisma.user.findFirst({
+        where: {
+          email: data.email,
+          NOT: { id: userId },
+        },
+      })
+
+      if (existingUser) {
+        throw new Error('Email is already in use')
+      }
+    }
+
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        phone: data.phone,
+      },
+      include: {
+        department: true,
+      },
+    })
+
+    await logAudit({
+      userId,
+      action: 'USER_UPDATED' as any,
+      description: `User ${user.email} updated their profile`,
+    })
+
+    return sanitizeUser(user)
+  }
+
   async changePassword(userId: string, currentPassword: string, newPassword: string) {
     const user = await prisma.user.findUnique({
       where: { id: userId },

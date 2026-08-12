@@ -54,6 +54,15 @@ export class UsersController {
     }
   }
 
+  async updateProfile(req: AuthRequest, res: Response) {
+    try {
+      const user = await usersService.updateProfile(req.user!.id, req.body)
+      res.json(successResponse(user, 'Profile updated successfully'))
+    } catch (error: any) {
+      res.status(400).json(errorResponse(error.message))
+    }
+  }
+
   async changePassword(req: AuthRequest, res: Response) {
     try {
       const { currentPassword, newPassword } = req.body

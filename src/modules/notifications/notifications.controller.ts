@@ -85,6 +85,26 @@ export class NotificationsController {
       res.status(400).json(errorResponse(error.message))
     }
   }
+
+  async deleteNotification(req: AuthRequest, res: Response) {
+    try {
+      const { id } = req.params
+      const notificationId = Array.isArray(id) ? id[0] : id
+      await notificationService.deleteNotification(req.user!.id, notificationId)
+      res.json(successResponse(null, 'Notification deleted successfully'))
+    } catch (error: any) {
+      res.status(400).json(errorResponse(error.message))
+    }
+  }
+
+  async clearNotifications(req: AuthRequest, res: Response) {
+    try {
+      await notificationService.clearNotifications(req.user!.id)
+      res.json(successResponse(null, 'Notifications cleared successfully'))
+    } catch (error: any) {
+      res.status(400).json(errorResponse(error.message))
+    }
+  }
 }
 
 export const notificationsController = NotificationsController.getInstance()

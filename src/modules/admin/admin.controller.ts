@@ -65,6 +65,28 @@ export class AdminController {
     }
   }
 
+  async updateUser(req: AuthRequest, res: Response) {
+    try {
+      const { id } = req.params
+      const userId = Array.isArray(id) ? id[0] : id
+      const user = await adminService.updateUser(userId, req.body)
+      res.json(successResponse(user, 'User updated successfully'))
+    } catch (error: any) {
+      res.status(400).json(errorResponse(error.message))
+    }
+  }
+
+  async deleteUser(req: AuthRequest, res: Response) {
+    try {
+      const { id } = req.params
+      const userId = Array.isArray(id) ? id[0] : id
+      const result = await adminService.deleteUser(userId)
+      res.json(successResponse(result, result.deleted ? 'User deleted successfully' : 'User has history and was deactivated instead'))
+    } catch (error: any) {
+      res.status(400).json(errorResponse(error.message))
+    }
+  }
+
   async resetPassword(req: AuthRequest, res: Response) {
     try {
       const { id } = req.params

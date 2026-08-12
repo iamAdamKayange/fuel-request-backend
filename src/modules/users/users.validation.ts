@@ -29,6 +29,15 @@ export const updateUserSchema = z.object({
   }),
 })
 
+export const updateProfileSchema = z.object({
+  body: z.object({
+    firstName: z.string().min(1).max(100).optional(),
+    lastName: z.string().min(1).max(100).optional(),
+    email: z.string().email().optional(),
+    phone: z.string().max(30).optional().nullable(),
+  }),
+})
+
 export const changePasswordSchema = z.object({
   body: z.object({
     currentPassword: z.string().min(6),
