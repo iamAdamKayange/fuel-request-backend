@@ -15,8 +15,8 @@ export class AdminController {
 
   async registerUser(req: AuthRequest, res: Response) {
     try {
-      const user = await adminService.registerUser(req.body)
-      res.status(201).json(successResponse(user, 'User registered successfully'))
+      const result = await adminService.registerUser(req.body)
+      res.status(201).json(successResponse(result, 'User registered successfully'))
     } catch (error: any) {
       res.status(400).json(errorResponse(error.message))
     }

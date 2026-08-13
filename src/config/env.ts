@@ -18,6 +18,14 @@ const envSchema = z.object({
   FRONTEND_URL: z.string().default('http://localhost:3000'),
   RATE_LIMIT_WINDOW: z.string().default('15'),
   RATE_LIMIT_MAX: z.string().default('100'),
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.string().optional(),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_FROM: z.string().optional(),
+  SMTP_SECURE: z.string().optional(),
+  SMTP_STARTTLS: z.string().optional(),
+  SMTP_HELO_HOST: z.string().optional(),
 })
 
 export const env = envSchema.parse(process.env)

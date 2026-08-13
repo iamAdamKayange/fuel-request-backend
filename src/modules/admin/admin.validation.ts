@@ -7,7 +7,7 @@ export const registerUserSchema = z.object({
     email: z.string().email('Invalid email address'),
     phone: z.string().optional(),
     role: z.enum(['DRIVER', 'HEAD_OF_DEPARTMENT', 'TRANSPORT_OFFICER', 'ADA_DAHRM', 'PROCUREMENT']),
-    departmentId: z.string().uuid('Invalid department ID'),
+    departmentId: z.string().min(1, 'Department is required'),
     password: z.string().min(6, 'Password must be at least 6 characters'),
   }),
 })
