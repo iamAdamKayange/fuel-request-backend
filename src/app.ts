@@ -22,24 +22,19 @@ import auditLogRoutes from './modules/audit-logs/audit-logs.routes'
 
 const app = express()
 
-// ============================================================
-// TRUST PROXY
-// ============================================================
-// Render runs the application behind a reverse proxy.
-// This allows Express to correctly process X-Forwarded-For
-// and allows express-rate-limit to identify client IPs correctly.
+/**
+ * Render / Reverse Proxy configuration
+ *
+ * Render sits behind a proxy and sends X-Forwarded-For.
+ * Trust the first proxy so Express and express-rate-limit
+ * can correctly determine the client IP.
+ */
 app.set('trust proxy', 1)
 
-// ============================================================
-// SECURITY MIDDLEWARE
-// ============================================================
-
+// Security middleware
 app.use(helmet())
 
-// ============================================================
 // CORS
-// ============================================================
-
 app.use(
   cors({
     origin: env.FRONTEND_URL,
@@ -47,12 +42,10 @@ app.use(
   })
 )
 
-// ============================================================
-// GENERAL MIDDLEWARE
-// ============================================================
-
+// Compression
 app.use(compression())
 
+// HTTP request logging
 app.use(
   morgan(
     env.NODE_ENV === 'development'
@@ -61,24 +54,18 @@ app.use(
   )
 )
 
+// Body parsers
 app.use(express.json())
-
 app.use(
   express.urlencoded({
     extended: true,
   })
 )
 
-// ============================================================
-// RATE LIMITER
-// ============================================================
-
+// Rate limiting
 app.use(limiter)
 
-// ============================================================
-// HEALTH CHECK
-// ============================================================
-
+// Health check
 app.get('/health', (_req, res) => {
   res.status(200).json({
     status: 'ok',
@@ -87,10 +74,7 @@ app.get('/health', (_req, res) => {
   })
 })
 
-// ============================================================
-// API ROUTES
-// ============================================================
-
+// API Routes
 app.use('/api/auth', authRoutes)
 
 app.use('/api/users', userRoutes)
@@ -111,10 +95,7 @@ app.use('/api/notifications', notificationRoutes)
 
 app.use('/api/audit-logs', auditLogRoutes)
 
-// ============================================================
-// 404 HANDLER
-// ============================================================
-
+// 404 handler
 app.use((req, res) => {
   res.status(404).json({
     success: false,
@@ -122,11 +103,7 @@ app.use((req, res) => {
   })
 })
 
-// ============================================================
-// GLOBAL ERROR HANDLER
-// ============================================================
-// MUST remain the last middleware.
-
+// Error handler MUST be last
 app.use(errorHandler)
 
 export default app

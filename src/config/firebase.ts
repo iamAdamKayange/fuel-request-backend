@@ -1,18 +1,24 @@
-import * as admin from 'firebase-admin'
+import {
+  cert,
+  getApps,
+  initializeApp,
+  type App,
+} from 'firebase-admin/app'
+
+import {
+  getMessaging,
+  type Messaging,
+} from 'firebase-admin/messaging'
+
 import { env } from './env'
 
-// Firebase Admin SDK
-const firebaseAdmin = admin as any
+let firebaseAdminInstance: App | null = null
+let fcmInstance: Messaging | null = null
 
-let firebaseAdminInstance: any = null
-let fcmInstance: any = null
-
-// Read Firebase environment variables safely
 const projectId = env.FIREBASE_PROJECT_ID?.trim()
 const clientEmail = env.FIREBASE_CLIENT_EMAIL?.trim()
-const privateKey = env.FIREBASE_PRIVATE_KEY
+const privateKey = env.FIREBASE_PRIVATE_KEY?.trim()
 
-// Check whether all Firebase credentials exist
 const hasFirebaseCredentials =
   Boolean(projectId) &&
   Boolean(clientEmail) &&
@@ -20,68 +26,47 @@ const hasFirebaseCredentials =
 
 if (hasFirebaseCredentials) {
   try {
-    // Prevent initializing Firebase more than once
-    if (!firebaseAdmin.apps.length) {
-      // Render/environment variables may contain literal \n
-      // Convert them into real new lines.
-      const formattedPrivateKey = privateKey!.replace(/\\n/g, '\n')
+    const existingApps = getApps()
 
-      const credential = firebaseAdmin.credential.cert({
-        projectId,
-        clientEmail,
-        privateKey: formattedPrivateKey,
-      })
-
-      firebaseAdmin.initializeApp({
-        credential,
-      })
-
-      console.log('🔥 Firebase initialized successfully')
+    if (existingApps.length > 0) {
+      firebaseAdminInstance = existingApps[0]
     } else {
-      console.log('🔥 Firebase app already initialized')
+      firebaseAdminInstance = initializeApp({
+        credential: cert({
+          projectId: projectId!,
+          clientEmail: clientEmail!,
+          privateKey: privateKey!.replace(/\\n/g, '\n'),
+        }),
+      })
     }
 
-    // Firebase Admin instance
-    firebaseAdminInstance = firebaseAdmin
+    fcmInstance = getMessaging(firebaseAdminInstance)
 
-    // Firebase Cloud Messaging
-    fcmInstance = firebaseAdmin.messaging()
-
-    console.log('🔥 Firebase Cloud Messaging ready')
+    console.log('🔥 Firebase Admin initialized successfully')
+    console.log(`🔥 Firebase project: ${projectId}`)
   } catch (error) {
-    console.error('❌ Firebase initialization failed:', error)
-
-    // Disable Firebase safely if initialization fails
     firebaseAdminInstance = null
     fcmInstance = null
+
+    console.error('❌ Firebase initialization failed:')
+
+    if (error instanceof Error) {
+      console.error(error.message)
+      console.error(error.stack)
+    } else {
+      console.error(error)
+    }
   }
 } else {
-  // Show only which variables are missing.
-  // NEVER print the private key.
-  const missing: string[] = []
-
-  if (!projectId) {
-    missing.push('FIREBASE_PROJECT_ID')
-  }
-
-  if (!clientEmail) {
-    missing.push('FIREBASE_CLIENT_EMAIL')
-  }
-
-  if (!privateKey) {
-    missing.push('FIREBASE_PRIVATE_KEY')
-  }
-
   console.warn(
-    `⚠️ Firebase credentials missing: ${missing.join(', ')}`
+    '⚠️ Firebase credentials are missing. Push notifications are disabled.'
   )
 
   console.warn(
-    '⚠️ Firebase Cloud Messaging is disabled.'
+    'Required: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY'
   )
 }
 
-// Export Firebase Admin and FCM
 export {
   firebaseAdminInstance as firebaseAdmin,
   fcmInstance as fcm,

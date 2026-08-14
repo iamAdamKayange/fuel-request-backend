@@ -38,6 +38,7 @@ enum RequestStatus {
 enum AuditAction {
   USER_REGISTERED
   USER_LOGGED_IN
+  USER_LOGGED_OUT
   USER_DEACTIVATED
   USER_ACTIVATED
   USER_ROLE_CHANGED
@@ -67,7 +68,7 @@ model User {
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 
-  department       Department?      @relation(fields: [departmentId], references: [id])
+  department       Department?     @relation(fields: [departmentId], references: [id])
   fuelRequests     FuelRequest[]
   approvals        Approval[]
   fuelIssuances    FuelIssuance[]
