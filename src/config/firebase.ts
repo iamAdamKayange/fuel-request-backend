@@ -1,39 +1,88 @@
 import * as admin from 'firebase-admin'
 import { env } from './env'
 
-// Use type assertion to bypass TypeScript issues
+// Firebase Admin SDK
 const firebaseAdmin = admin as any
 
-// Initialize Firebase only if credentials are provided
 let firebaseAdminInstance: any = null
 let fcmInstance: any = null
 
-const hasFirebaseCredentials = 
-  env.FIREBASE_PROJECT_ID && 
-  env.FIREBASE_CLIENT_EMAIL && 
-  env.FIREBASE_PRIVATE_KEY
+// Read Firebase environment variables safely
+const projectId = env.FIREBASE_PROJECT_ID?.trim()
+const clientEmail = env.FIREBASE_CLIENT_EMAIL?.trim()
+const privateKey = env.FIREBASE_PRIVATE_KEY
+
+// Check whether all Firebase credentials exist
+const hasFirebaseCredentials =
+  Boolean(projectId) &&
+  Boolean(clientEmail) &&
+  Boolean(privateKey)
 
 if (hasFirebaseCredentials) {
   try {
+    // Prevent initializing Firebase more than once
     if (!firebaseAdmin.apps.length) {
+      // Render/environment variables may contain literal \n
+      // Convert them into real new lines.
+      const formattedPrivateKey = privateKey!.replace(/\\n/g, '\n')
+
       const credential = firebaseAdmin.credential.cert({
-        projectId: env.FIREBASE_PROJECT_ID,
-        clientEmail: env.FIREBASE_CLIENT_EMAIL,
-        privateKey: env.FIREBASE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
+        projectId,
+        clientEmail,
+        privateKey: formattedPrivateKey,
       })
 
       firebaseAdmin.initializeApp({
         credential,
       })
+
       console.log('🔥 Firebase initialized successfully')
+    } else {
+      console.log('🔥 Firebase app already initialized')
     }
+
+    // Firebase Admin instance
     firebaseAdminInstance = firebaseAdmin
+
+    // Firebase Cloud Messaging
     fcmInstance = firebaseAdmin.messaging()
+
+    console.log('🔥 Firebase Cloud Messaging ready')
   } catch (error) {
     console.error('❌ Firebase initialization failed:', error)
+
+    // Disable Firebase safely if initialization fails
+    firebaseAdminInstance = null
+    fcmInstance = null
   }
 } else {
-  console.warn('⚠️ Firebase credentials not provided. Push notifications disabled.')
+  // Show only which variables are missing.
+  // NEVER print the private key.
+  const missing: string[] = []
+
+  if (!projectId) {
+    missing.push('FIREBASE_PROJECT_ID')
+  }
+
+  if (!clientEmail) {
+    missing.push('FIREBASE_CLIENT_EMAIL')
+  }
+
+  if (!privateKey) {
+    missing.push('FIREBASE_PRIVATE_KEY')
+  }
+
+  console.warn(
+    `⚠️ Firebase credentials missing: ${missing.join(', ')}`
+  )
+
+  console.warn(
+    '⚠️ Firebase Cloud Messaging is disabled.'
+  )
 }
 
-export { firebaseAdminInstance as firebaseAdmin, fcmInstance as fcm }
+// Export Firebase Admin and FCM
+export {
+  firebaseAdminInstance as firebaseAdmin,
+  fcmInstance as fcm,
+}
