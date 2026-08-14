@@ -39,6 +39,7 @@ export const updateAdminUserSchema = z.object({
     role: z.enum(['ADMIN', 'DRIVER', 'HEAD_OF_DEPARTMENT', 'TRANSPORT_OFFICER', 'ADA_DAHRM', 'PROCUREMENT']).optional(),
     departmentId: z.string().optional().nullable(),
     isActive: z.boolean().optional(),
+    password: z.string().min(6, 'Password must be at least 6 characters').optional().or(z.literal('')),
   }),
 })
 

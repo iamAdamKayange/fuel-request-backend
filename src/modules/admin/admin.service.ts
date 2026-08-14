@@ -1,7 +1,6 @@
 import { prisma } from '../../config/database'
 import { hashPassword, generateEmployeeNumber, sanitizeUser } from '../../utils/helpers'
 import { logAudit } from '../../utils/logger'
-import { sendEmail } from '../../utils/email'
 
 export class AdminService {
   private static instance: AdminService
@@ -172,17 +171,23 @@ export class AdminService {
       }
     }
 
+    const updateData: any = {
+      firstName: data.firstName,
+      lastName: data.lastName,
+      email: data.email,
+      phone: data.phone,
+      role: data.role as any,
+      departmentId: data.departmentId,
+      isActive: data.isActive,
+    }
+
+    if (data.password) {
+      updateData.password = await hashPassword(data.password)
+    }
+
     const user = await prisma.user.update({
       where: { id },
-      data: {
-        firstName: data.firstName,
-        lastName: data.lastName,
-        email: data.email,
-        phone: data.phone,
-        role: data.role as any,
-        departmentId: data.departmentId,
-        isActive: data.isActive,
-      },
+      data: updateData,
       include: { department: true },
     })
 
@@ -192,29 +197,7 @@ export class AdminService {
       description: `Admin updated user ${user.email}`,
     })
 
-    const emailResult = await sendEmail({
-      to: user.email,
-      subject: 'Akaunti yako ya Kibali Mafuta',
-      text: [
-        `Habari ${user.firstName},`,
-        '',
-        'Akaunti yako ya mfumo wa Kibali cha Kuchukua Mafuta imesajiliwa.',
-        '',
-        `Email: ${user.email}`,
-        `Password ya muda: ${data.password}`,
-        '',
-        'Tafadhali ingia kwenye mfumo na uhifadhi taarifa hizi kwa usalama.',
-      ].join('\n'),
-    })
-
-    return {
-      user: sanitizeUser(user),
-      credentials: {
-        email: user.email,
-        password: data.password,
-      },
-      email: emailResult,
-    }
+    return sanitizeUser(user)
   }
 
   async deleteUser(id: string) {
