@@ -55,7 +55,12 @@ export class NotificationService {
           tokens,
         }
 
-        const response = await fcm.sendEachForMulticast(message as any)
+      if (!fcm) {
+  logger.warn('Firebase Messaging is not initialized. Skipping push notification.')
+  return notification
+}
+
+const response = await fcm.sendEachForMulticast(message as any)
 
         // Handle failed tokens
         if (response.failureCount > 0) {
