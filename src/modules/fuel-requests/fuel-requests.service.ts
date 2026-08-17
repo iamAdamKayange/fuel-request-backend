@@ -297,9 +297,30 @@ export class FuelRequestsService {
     }
 
     const allowedStatusByRole: Record<string, string[]> = {
-      TRANSPORT_OFFICER: ['PENDING_TRANSPORT_APPROVAL'],
-      ADA_DAHRM: ['PENDING_DA_APPROVAL'],
-      PROCUREMENT: ['PENDING_FUEL_ISSUANCE'],
+      TRANSPORT_OFFICER: [
+        'PENDING_TRANSPORT_APPROVAL',
+        'TRANSPORT_APPROVED',
+        'TRANSPORT_REJECTED',
+        'PENDING_DA_APPROVAL',
+        'ADA_APPROVED',
+        'ADA_REJECTED',
+        'PENDING_FUEL_ISSUANCE',
+        'COMPLETED',
+        'CANCELLED',
+      ],
+      ADA_DAHRM: [
+        'PENDING_DA_APPROVAL',
+        'ADA_APPROVED',
+        'ADA_REJECTED',
+        'PENDING_FUEL_ISSUANCE',
+        'COMPLETED',
+        'CANCELLED',
+      ],
+      PROCUREMENT: [
+        'PENDING_FUEL_ISSUANCE',
+        'COMPLETED',
+        'CANCELLED',
+      ],
     }
 
     if (role && allowedStatusByRole[role] && !allowedStatusByRole[role].includes(request.status)) {

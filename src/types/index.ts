@@ -72,6 +72,7 @@ export interface User {
   employeeNumber: string
   firstName: string
   lastName: string
+  title?: string | null
   email: string
   phone?: string
   role: Role

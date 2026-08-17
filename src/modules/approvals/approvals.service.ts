@@ -109,6 +109,14 @@ export class ApprovalsService {
           type: 'REQUEST_APPROVED',
         })
       }
+
+      await notificationService.sendNotification({
+        userId: request.driverId,
+        requestId,
+        title: 'Fuel Request Approved',
+        message: `Your request ${request.requestNumber} has been approved by Head of Department and sent to Transport Officer.`,
+        type: 'REQUEST_APPROVED',
+      })
     } else {
       // Notify Driver
       await notificationService.sendNotification({
@@ -231,7 +239,7 @@ export class ApprovalsService {
 
     // Send notifications
     if (data.approved) {
-      // Notify ADA/DAHRM
+      // Notify ADA
       const adaOfficers = await prisma.user.findMany({
         where: {
           role: 'ADA_DAHRM',
@@ -248,6 +256,14 @@ export class ApprovalsService {
           type: 'REQUEST_APPROVED',
         })
       }
+
+      await notificationService.sendNotification({
+        userId: request.driverId,
+        requestId,
+        title: 'Fuel Request Approved',
+        message: `Your request ${request.requestNumber} has been approved by Transport Officer and sent to ADA.`,
+        type: 'REQUEST_APPROVED',
+      })
     } else {
       // Notify Driver
       await notificationService.sendNotification({
@@ -301,7 +317,7 @@ export class ApprovalsService {
       throw new Error('Request is not ready for ADA approval')
     }
 
-    // Check if approver is ADA/DAHRM
+    // Check if approver is ADA
     const approver = await prisma.user.findUnique({
       where: { id: approverId },
     })
@@ -362,7 +378,7 @@ export class ApprovalsService {
       requestId,
       previousStatus: request.status,
       newStatus: newStatus as any,
-      description: `ADA/DAHRM ${approver.email} ${data.approved ? 'approved' : 'rejected'} request ${request.requestNumber}`,
+      description: `ADA ${approver.email} ${data.approved ? 'approved' : 'rejected'} request ${request.requestNumber}`,
     })
 
     // Send notifications
@@ -380,24 +396,32 @@ export class ApprovalsService {
           userId: officer.id,
           requestId,
           title: 'Fuel Request Approved by ADA',
-          message: `Request ${request.requestNumber} has been approved by ADA/DAHRM and is ready for fuel issuance`,
+          message: `Request ${request.requestNumber} has been approved by ADA and is ready for fuel issuance`,
           type: 'REQUEST_APPROVED',
         })
       }
+
+      await notificationService.sendNotification({
+        userId: request.driverId,
+        requestId,
+        title: 'Fuel Request Approved',
+        message: `Your request ${request.requestNumber} has been approved by ADA and sent for fuel issuance.`,
+        type: 'REQUEST_APPROVED',
+      })
     } else {
       // Notify Driver
       await notificationService.sendNotification({
         userId: request.driverId,
         requestId,
         title: 'Fuel Request Rejected',
-        message: `Your request ${request.requestNumber} has been rejected by ADA/DAHRM. Reason: ${data.reason}`,
+        message: `Your request ${request.requestNumber} has been rejected by ADA. Reason: ${data.reason}`,
         type: 'REQUEST_REJECTED',
       })
     }
 
     await notificationService.sendToAdmins({
       requestId,
-      title: data.approved ? 'ADA/DAHRM Approved Request' : 'ADA/DAHRM Rejected Request',
+      title: data.approved ? 'ADA Approved Request' : 'ADA Rejected Request',
       message: `Request ${request.requestNumber} for ${request.department.name} was ${data.approved ? 'approved' : 'rejected'} by ${approver.email}`,
       type: 'ADMIN_REQUEST_UPDATE',
     })

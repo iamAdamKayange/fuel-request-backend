@@ -4,6 +4,7 @@ export const registerUserSchema = z.object({
   body: z.object({
     firstName: z.string().min(1, 'First name is required'),
     lastName: z.string().min(1, 'Last name is required'),
+    title: z.string().min(1, 'Title is required'),
     email: z.string().email('Invalid email address'),
     phone: z.string().optional(),
     role: z.enum(['DRIVER', 'HEAD_OF_DEPARTMENT', 'TRANSPORT_OFFICER', 'ADA_DAHRM', 'PROCUREMENT']),
@@ -34,6 +35,7 @@ export const updateAdminUserSchema = z.object({
   body: z.object({
     firstName: z.string().min(1).optional(),
     lastName: z.string().min(1).optional(),
+    title: z.string().min(1).optional(),
     email: z.string().email().optional(),
     phone: z.string().optional().nullable(),
     role: z.enum(['ADMIN', 'DRIVER', 'HEAD_OF_DEPARTMENT', 'TRANSPORT_OFFICER', 'ADA_DAHRM', 'PROCUREMENT']).optional(),

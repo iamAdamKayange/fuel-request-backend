@@ -15,6 +15,7 @@ export class AdminService {
   async registerUser(data: {
     firstName: string
     lastName: string
+    title: string
     email: string
     phone?: string
     role: string
@@ -47,6 +48,7 @@ export class AdminService {
         employeeNumber,
         firstName: data.firstName,
         lastName: data.lastName,
+        title: data.title,
         email: data.email,
         phone: data.phone,
         password: hashedPassword,
@@ -174,6 +176,7 @@ export class AdminService {
     const updateData: any = {
       firstName: data.firstName,
       lastName: data.lastName,
+      title: data.title,
       email: data.email,
       phone: data.phone,
       role: data.role as any,
