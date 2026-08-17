@@ -120,6 +120,13 @@ export class ApprovalsService {
       })
     }
 
+    await notificationService.sendToAdmins({
+      requestId,
+      title: data.approved ? 'Head Approved Request' : 'Head Rejected Request',
+      message: `Request ${request.requestNumber} for ${request.department.name} was ${data.approved ? 'approved' : 'rejected'} by ${approver.email}`,
+      type: 'ADMIN_REQUEST_UPDATE',
+    })
+
     return {
       approval,
       request: updatedRequest,
@@ -144,6 +151,7 @@ export class ApprovalsService {
       where: { id: requestId },
       include: {
         driver: true,
+        department: true,
       },
     })
 
@@ -207,6 +215,7 @@ export class ApprovalsService {
       data: updateData,
       include: {
         driver: true,
+        department: true,
       },
     })
 
@@ -250,6 +259,13 @@ export class ApprovalsService {
       })
     }
 
+    await notificationService.sendToAdmins({
+      requestId,
+      title: data.approved ? 'Transport Approved Request' : 'Transport Rejected Request',
+      message: `Request ${request.requestNumber} for ${request.department.name} was ${data.approved ? 'approved' : 'rejected'} by ${approver.email}`,
+      type: 'ADMIN_REQUEST_UPDATE',
+    })
+
     return {
       approval,
       request: updatedRequest,
@@ -272,6 +288,7 @@ export class ApprovalsService {
       where: { id: requestId },
       include: {
         driver: true,
+        department: true,
       },
     })
 
@@ -334,6 +351,7 @@ export class ApprovalsService {
       data: updateData,
       include: {
         driver: true,
+        department: true,
       },
     })
 
@@ -376,6 +394,13 @@ export class ApprovalsService {
         type: 'REQUEST_REJECTED',
       })
     }
+
+    await notificationService.sendToAdmins({
+      requestId,
+      title: data.approved ? 'ADA/DAHRM Approved Request' : 'ADA/DAHRM Rejected Request',
+      message: `Request ${request.requestNumber} for ${request.department.name} was ${data.approved ? 'approved' : 'rejected'} by ${approver.email}`,
+      type: 'ADMIN_REQUEST_UPDATE',
+    })
 
     return {
       approval,

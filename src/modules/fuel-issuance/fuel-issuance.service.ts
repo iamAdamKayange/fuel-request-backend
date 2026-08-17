@@ -28,6 +28,7 @@ export class FuelIssuanceService {
       where: { id: requestId },
       include: {
         driver: true,
+        department: true,
       },
     })
 
@@ -90,6 +91,7 @@ export class FuelIssuanceService {
       },
       include: {
         driver: true,
+        department: true,
       },
     })
 
@@ -110,6 +112,13 @@ export class FuelIssuanceService {
       title: 'Fuel Request Completed',
       message: `Your request ${request.requestNumber} has been completed. ${data.litresIssued} litres of ${data.fuelType} issued. Token: ${data.tokenNumber}`,
       type: 'REQUEST_COMPLETED',
+    })
+
+    await notificationService.sendToAdmins({
+      requestId,
+      title: 'Fuel Request Completed',
+      message: `Request ${request.requestNumber} for ${request.department.name} was completed by ${issuer.email}. ${data.litresIssued} litres issued.`,
+      type: 'ADMIN_REQUEST_UPDATE',
     })
 
     return {

@@ -90,6 +90,80 @@ const response = await fcm.sendEachForMulticast(message as any)
     return notification
   }
 
+  async sendToUsers(
+    userIds: string[],
+    data: {
+      requestId?: string
+      title: string
+      message: string
+      type: string
+    }
+  ) {
+    const uniqueUserIds = [...new Set(userIds.filter(Boolean))]
+
+    return Promise.all(
+      uniqueUserIds.map((userId) =>
+        this.sendNotification({
+          userId,
+          ...data,
+        })
+      )
+    )
+  }
+
+  async sendToAdmins(data: {
+    requestId?: string
+    title: string
+    message: string
+    type: string
+  }) {
+    const admins = await prisma.user.findMany({
+      where: {
+        role: 'ADMIN',
+        isActive: true,
+      },
+      select: { id: true },
+    })
+
+    return this.sendToUsers(
+      admins.map((admin) => admin.id),
+      data
+    )
+  }
+
+  async sendToDepartmentHeads(
+    departmentId: string,
+    data: {
+      requestId?: string
+      title: string
+      message: string
+      type: string
+    }
+  ) {
+    const [department, heads] = await Promise.all([
+      prisma.department.findUnique({
+        where: { id: departmentId },
+        select: { headUserId: true },
+      }),
+      prisma.user.findMany({
+        where: {
+          departmentId,
+          role: 'HEAD_OF_DEPARTMENT',
+          isActive: true,
+        },
+        select: { id: true },
+      }),
+    ])
+
+    return this.sendToUsers(
+      [
+        department?.headUserId || '',
+        ...heads.map((head) => head.id),
+      ],
+      data
+    )
+  }
+
   async registerDeviceToken(userId: string, fcmToken: string, deviceType?: string) {
     // Check if token exists
     const existingToken = await prisma.deviceToken.findUnique({

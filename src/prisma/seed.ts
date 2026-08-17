@@ -2,41 +2,31 @@ import { PrismaClient, Role } from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { env } from '../config/env'
 import { hashPassword } from '../utils/helpers'
+import { DEFAULT_ORGANIZATION_UNITS } from '../utils/organization'
 
 const adapter = new PrismaPg({ connectionString: env.DATABASE_URL })
 const prisma = new PrismaClient({ adapter })
 
+function slugifyName(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
 async function main() {
   console.log('🌱 Starting seed...')
 
-  // Create departments
-  const departments = await Promise.all([
-    prisma.department.upsert({
-      where: { name: 'Habari' },
-      update: {},
-      create: { name: 'Habari', description: 'Department of Information' },
-    }),
-    prisma.department.upsert({
-      where: { name: 'Utamaduni' },
-      update: {},
-      create: { name: 'Utamaduni', description: 'Department of Culture' },
-    }),
-    prisma.department.upsert({
-      where: { name: 'Sanaa' },
-      update: {},
-      create: { name: 'Sanaa', description: 'Department of Arts' },
-    }),
-    prisma.department.upsert({
-      where: { name: 'Michezo' },
-      update: {},
-      create: { name: 'Michezo', description: 'Department of Sports' },
-    }),
-    prisma.department.upsert({
-      where: { name: 'Usafirishaji' },
-      update: {},
-      create: { name: 'Usafirishaji', description: 'Department of Transport' },
-    }),
-  ])
+  // Create departments and units
+  const departments = await Promise.all(
+    DEFAULT_ORGANIZATION_UNITS.map((unit) =>
+      prisma.department.upsert({
+        where: { name: unit.name },
+        update: { description: unit.description },
+        create: unit,
+      })
+    )
+  )
 
   console.log(`✅ Created ${departments.length} departments`)
 
@@ -83,16 +73,17 @@ async function main() {
   console.log(`Requested admin created/updated: ${adamAdmin.email}`)
 
   // Create head of department for each department
-  for (const dept of departments) {
+  for (const [index, dept] of departments.entries()) {
     const headPassword = await hashPassword('Head@123')
+    const departmentSlug = slugifyName(dept.name)
     const head = await prisma.user.upsert({
-      where: { email: `head.${dept.name.toLowerCase()}@wizara.go.tz` },
+      where: { email: `head.${departmentSlug}@wizara.go.tz` },
       update: {},
       create: {
-        employeeNumber: `HOD-${dept.name.substring(0, 3).toUpperCase()}-001`,
+        employeeNumber: `HOD-${String(index + 1).padStart(3, '0')}`,
         firstName: 'Head',
         lastName: dept.name,
-        email: `head.${dept.name.toLowerCase()}@wizara.go.tz`,
+        email: `head.${departmentSlug}@wizara.go.tz`,
         password: headPassword,
         role: Role.HEAD_OF_DEPARTMENT,
         departmentId: dept.id,
@@ -116,28 +107,28 @@ async function main() {
       firstName: 'Driver',
       lastName: 'User',
       role: Role.DRIVER,
-      departmentId: departments.find(d => d.name === 'Usafirishaji')?.id,
+      departmentId: departments.find(d => d.name === 'IDARA YA UTAWALA NA RASLIMALI WATU')?.id,
     },
     {
       email: 'transport@wizara.go.tz',
       firstName: 'Transport',
       lastName: 'Officer',
       role: Role.TRANSPORT_OFFICER,
-      departmentId: departments.find(d => d.name === 'Usafirishaji')?.id,
+      departmentId: departments.find(d => d.name === 'IDARA YA UTAWALA NA RASLIMALI WATU')?.id,
     },
     {
       email: 'ada.dahrm@wizara.go.tz',
       firstName: 'ADA',
       lastName: 'DAHRM',
       role: Role.ADA_DAHRM,
-      departmentId: departments.find(d => d.name === 'Habari')?.id,
+      departmentId: departments.find(d => d.name === 'IDARA YA HABARI')?.id,
     },
     {
       email: 'procurement@wizara.go.tz',
       firstName: 'Procurement',
       lastName: 'Officer',
       role: Role.PROCUREMENT,
-      departmentId: departments.find(d => d.name === 'Habari')?.id,
+      departmentId: departments.find(d => d.name === 'KITENGO CHA UGAVI NA MANUNUZI')?.id,
     },
   ]
 

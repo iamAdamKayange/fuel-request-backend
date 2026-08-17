@@ -4,6 +4,7 @@ export const createFuelRequestSchema = z.object({
   body: z.object({
     vehicleId: z.string().optional(),
     vehicleNumber: z.string().trim().min(1, 'Vehicle number is required'),
+    departmentId: z.string().min(1, 'Department or unit is required'),
     fuelType: z.enum(['DIESEL', 'PETROL']),
     requestedLitres: z.number().positive('Litres must be positive'),
     purpose: z.string().min(1, 'Purpose is required'),

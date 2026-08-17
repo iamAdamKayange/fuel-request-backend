@@ -1,4 +1,5 @@
 import { prisma } from '../../config/database'
+import { DEFAULT_ORGANIZATION_UNITS } from '../../utils/organization'
 
 export class DepartmentsService {
   private static instance: DepartmentsService
@@ -8,6 +9,20 @@ export class DepartmentsService {
       DepartmentsService.instance = new DepartmentsService()
     }
     return DepartmentsService.instance
+  }
+
+  async ensureDefaultDepartments() {
+    await Promise.all(
+      DEFAULT_ORGANIZATION_UNITS.map((unit) =>
+        prisma.department.upsert({
+          where: { name: unit.name },
+          update: {
+            description: unit.description,
+          },
+          create: unit,
+        })
+      )
+    )
   }
 
   async createDepartment(data: { name: string; description?: string; headUserId?: string }) {
@@ -45,6 +60,8 @@ export class DepartmentsService {
   }
 
   async getDepartments() {
+    await this.ensureDefaultDepartments()
+
     const departments = await prisma.department.findMany({
       include: {
         _count: {

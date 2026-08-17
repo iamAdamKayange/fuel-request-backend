@@ -18,6 +18,7 @@ export class FuelRequestsService {
   async createFuelRequest(driverId: string, data: {
     vehicleId?: string
     vehicleNumber: string
+    departmentId: string
     fuelType: string
     requestedLitres: number
     purpose: string
@@ -36,8 +37,12 @@ export class FuelRequestsService {
       throw new Error('Driver not found')
     }
 
-    if (!driver.departmentId) {
-      throw new Error('Driver has no department assigned')
+    const targetDepartment = await prisma.department.findUnique({
+      where: { id: data.departmentId },
+    })
+
+    if (!targetDepartment) {
+      throw new Error('Selected department or unit was not found')
     }
 
     const vehicleNumber = data.vehicleNumber.trim().toUpperCase()
@@ -62,7 +67,7 @@ export class FuelRequestsService {
           vehicleNumber,
           gpsa: 'N/A',
           fuelType: data.fuelType as any,
-          departmentId: driver.departmentId,
+          departmentId: targetDepartment.id,
           isActive: true,
         },
       })
@@ -78,7 +83,7 @@ export class FuelRequestsService {
     // Get head of department
     const headOfDepartment = await prisma.user.findFirst({
       where: {
-        departmentId: driver.departmentId,
+        departmentId: targetDepartment.id,
         role: 'HEAD_OF_DEPARTMENT',
         isActive: true,
       },
@@ -96,7 +101,7 @@ export class FuelRequestsService {
       data: {
         requestNumber,
         driverId,
-        departmentId: driver.departmentId,
+        departmentId: targetDepartment.id,
         vehicleId: vehicle.id,
         fuelType: data.fuelType as any,
         requestedLitres: data.requestedLitres,
@@ -127,13 +132,19 @@ export class FuelRequestsService {
       description: `Driver ${driver.email} submitted fuel request ${fuelRequest.requestNumber}`,
     })
 
-    // Send notification to Head of Department
-    await notificationService.sendNotification({
-      userId: headOfDepartment.id,
+    // Send notification to the selected department/unit heads.
+    await notificationService.sendToDepartmentHeads(targetDepartment.id, {
       requestId: fuelRequest.id,
       title: 'New Fuel Request',
-      message: `New fuel request ${fuelRequest.requestNumber} from ${driver.firstName} ${driver.lastName} requires your approval`,
+      message: `New fuel request ${fuelRequest.requestNumber} from ${driver.firstName} ${driver.lastName} was sent to ${targetDepartment.name} and requires approval`,
       type: 'REQUEST_SUBMITTED',
+    })
+
+    await notificationService.sendToAdmins({
+      requestId: fuelRequest.id,
+      title: 'New Fuel Request Submitted',
+      message: `Request ${fuelRequest.requestNumber} was submitted to ${targetDepartment.name} by ${driver.firstName} ${driver.lastName}`,
+      type: 'ADMIN_REQUEST_UPDATE',
     })
 
     return fuelRequest
