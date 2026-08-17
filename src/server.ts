@@ -1,11 +1,15 @@
 import app from './app'
 import { env } from './config/env'
 import { connectDatabase, prisma } from './config/database'
+import { execFileSync } from 'node:child_process'
+import path from 'node:path'
 
 const PORT = Number.parseInt(env.PORT, 10) || 5000
 
 async function startServer() {
   try {
+    await runDatabaseMigrations()
+
     // Connect to database before starting HTTP server
     await connectDatabase()
 
@@ -51,6 +55,29 @@ async function startServer() {
     }
 
     process.exit(1)
+  }
+}
+
+async function runDatabaseMigrations() {
+  if (env.NODE_ENV !== 'production') {
+    return
+  }
+
+  try {
+    console.log('Running database migrations...')
+
+    const prismaBinary = process.platform === 'win32' ? 'npx.cmd' : 'npx'
+    const schemaPath = path.join(process.cwd(), 'src', 'prisma', 'schema.prisma')
+
+    execFileSync(prismaBinary, ['prisma', 'migrate', 'deploy', '--schema', schemaPath], {
+      stdio: 'inherit',
+      env: process.env,
+    })
+
+    console.log('Database migrations completed')
+  } catch (error) {
+    console.error('Failed to run database migrations:', error)
+    throw error
   }
 }
 
