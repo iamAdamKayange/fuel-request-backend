@@ -22,6 +22,17 @@ import auditLogRoutes from './modules/audit-logs/audit-logs.routes'
 
 const app = express()
 
+const allowedOrigins = new Set(
+  env.FRONTEND_URL.split(',')
+    .map((origin) => origin.trim().replace(/\/+$/, ''))
+    .filter(Boolean)
+)
+
+if (env.NODE_ENV === 'development') {
+  allowedOrigins.add('http://localhost:3000')
+  allowedOrigins.add('http://127.0.0.1:3000')
+}
+
 /**
  * Render / Reverse Proxy configuration
  *
@@ -37,8 +48,23 @@ app.use(helmet())
 // CORS
 app.use(
   cors({
-    origin: env.FRONTEND_URL,
+    origin(origin, callback) {
+      if (!origin) {
+        callback(null, true)
+        return
+      }
+
+      const normalizedOrigin = origin.replace(/\/+$/, '')
+
+      if (allowedOrigins.has(normalizedOrigin)) {
+        callback(null, true)
+        return
+      }
+
+      callback(new Error(`CORS blocked origin: ${origin}`))
+    },
     credentials: true,
+    optionsSuccessStatus: 204,
   })
 )
 
