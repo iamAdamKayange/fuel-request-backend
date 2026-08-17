@@ -16,7 +16,8 @@ export class FuelRequestsService {
   }
 
   async createFuelRequest(driverId: string, data: {
-    vehicleId: string
+    vehicleId?: string
+    vehicleNumber: string
     fuelType: string
     requestedLitres: number
     purpose: string
@@ -39,13 +40,32 @@ export class FuelRequestsService {
       throw new Error('Driver has no department assigned')
     }
 
-    // Get vehicle
-    const vehicle = await prisma.vehicle.findUnique({
-      where: { id: data.vehicleId },
-    })
+    const vehicleNumber = data.vehicleNumber.trim().toUpperCase()
+
+    // Get or create vehicle from the number typed by the driver.
+    let vehicle = data.vehicleId
+      ? await prisma.vehicle.findUnique({
+          where: { id: data.vehicleId },
+        })
+      : await prisma.vehicle.findFirst({
+          where: {
+            vehicleNumber: {
+              equals: vehicleNumber,
+              mode: 'insensitive',
+            },
+          },
+        })
 
     if (!vehicle) {
-      throw new Error('Vehicle not found')
+      vehicle = await prisma.vehicle.create({
+        data: {
+          vehicleNumber,
+          gpsa: 'N/A',
+          fuelType: data.fuelType as any,
+          departmentId: driver.departmentId,
+          isActive: true,
+        },
+      })
     }
 
     if (!vehicle.isActive) {
@@ -77,7 +97,7 @@ export class FuelRequestsService {
         requestNumber,
         driverId,
         departmentId: driver.departmentId,
-        vehicleId: data.vehicleId,
+        vehicleId: vehicle.id,
         fuelType: data.fuelType as any,
         requestedLitres: data.requestedLitres,
         gpsa: vehicle.gpsa,
