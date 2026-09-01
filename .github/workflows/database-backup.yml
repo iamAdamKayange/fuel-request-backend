@@ -1,0 +1,29 @@
+name: Database Backup
+
+on:
+  schedule:
+    # 23:00 UTC = 02:00 Tanzania time
+    - cron: "0 23 * * *"
+
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Make backup script executable
+        run: chmod +x scripts/backup-database.sh
+
+      - name: Run database backup
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: ./scripts/backup-database.sh
