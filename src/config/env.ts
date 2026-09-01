@@ -24,6 +24,32 @@ const envSchema = z.object({
     .string()
     .default('7d'),
 
+  CSRF_SECRET: z
+    .string()
+    .min(32, 'CSRF_SECRET must be at least 32 characters')
+    .default('default-csrf-secret-change-in-production'),
+
+  SESSION_TIMEOUT_MINUTES: z
+    .string()
+    .default('30'),
+
+  ENCRYPTION_KEY: z
+    .string()
+    .min(32, 'ENCRYPTION_KEY must be at least 32 characters')
+    .default('default-encryption-key-change-in-production'),
+
+  SMS_API_URL: z
+    .string()
+    .optional(),
+
+  SMS_API_KEY: z
+    .string()
+    .optional(),
+
+  SMS_SENDER_ID: z
+    .string()
+    .optional(),
+
   FIREBASE_PROJECT_ID: z
     .string()
     .optional(),

@@ -3,6 +3,7 @@ import { env } from './config/env'
 import { connectDatabase, prisma } from './config/database'
 import { execFileSync } from 'node:child_process'
 import path from 'node:path'
+import { webSocketService } from './modules/websocket/websocket.service'
 
 const PORT = Number.parseInt(env.PORT, 10) || 5000
 
@@ -17,6 +18,9 @@ async function startServer() {
       console.log(`Server running on http://localhost:${PORT}`)
       console.log(`Environment: ${env.NODE_ENV}`)
     })
+
+    // Initialize WebSocket server
+    webSocketService.initialize(server)
 
     const shutdown = async (signal: string) => {
       console.log(

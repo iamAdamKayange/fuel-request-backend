@@ -4,6 +4,11 @@ import { env } from '../../config/env'
 import { comparePassword, sanitizeUser } from '../../utils/helpers'
 import { logAudit } from '../../utils/logger'
 import { Request } from 'express'
+import { isEmailConfigured, sendAccountLockedNotification } from '../../utils/email'
+import { isSMSConfigured, sendAccountLockedSMS } from '../../utils/sms'
+
+const MAX_LOGIN_ATTEMPTS = 5
+const LOCKOUT_DURATION_MINUTES = 15
 
 export class AuthService {
   private static instance: AuthService
@@ -31,16 +36,71 @@ export class AuthService {
       throw new Error('Account is deactivated')
     }
 
+    // Check if account is locked
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
+      const remainingTime = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60000)
+      throw new Error(`Account is locked. Try again in ${remainingTime} minutes`)
+    }
+
     const isValidPassword = await comparePassword(password, user.password)
 
     if (!isValidPassword) {
-      throw new Error('Invalid credentials')
+      // Increment failed login attempts
+      const failedAttempts = (user.failedLoginAttempts || 0) + 1
+      
+      if (failedAttempts >= MAX_LOGIN_ATTEMPTS) {
+        // Lock the account
+        const lockUntil = new Date(Date.now() + LOCKOUT_DURATION_MINUTES * 60000)
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            failedLoginAttempts: failedAttempts,
+            lockedUntil: lockUntil,
+          },
+        })
+
+        await logAudit({
+          userId: user.id,
+          action: 'USER_ACCOUNT_LOCKED' as any,
+          description: `Account ${user.email} locked due to too many failed login attempts`,
+          ipAddress: req.ip,
+          userAgent: req.headers['user-agent'],
+        })
+
+        // Send email notification if configured
+        if (isEmailConfigured()) {
+          await sendAccountLockedNotification(
+            user.email,
+            `${user.firstName} ${user.lastName}`
+          )
+        }
+
+        // Send SMS notification if configured
+        if (isSMSConfigured() && user.phone) {
+          await sendAccountLockedSMS(user.phone)
+        }
+
+        throw new Error(`Account locked due to too many failed attempts. Try again in ${LOCKOUT_DURATION_MINUTES} minutes`)
+      } else {
+        // Just increment failed attempts
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { failedLoginAttempts: failedAttempts },
+        })
+
+        const remainingAttempts = MAX_LOGIN_ATTEMPTS - failedAttempts
+        throw new Error(`Invalid credentials. ${remainingAttempts} attempts remaining before account lockout`)
+      }
     }
 
-    // Update last login
+    // Password is valid - reset failed attempts and lock
     await prisma.user.update({
       where: { id: user.id },
-      data: { lastLogin: new Date() },
+      data: {
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+        lastLogin: new Date(),
+      },
     })
 
     const accessToken = this.generateAccessToken(user)
@@ -70,6 +130,7 @@ export class AuthService {
     }
 
     try {
+      jwt.verify(refreshToken, secret)
     } catch (error) {
       throw new Error('Invalid refresh token')
     }

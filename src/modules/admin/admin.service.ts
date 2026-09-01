@@ -1,6 +1,8 @@
 import { prisma } from '../../config/database'
 import { hashPassword, generateEmployeeNumber, sanitizeUser } from '../../utils/helpers'
 import { logAudit } from '../../utils/logger'
+import { validatePasswordComplexity, isCommonPassword } from '../../utils/password'
+import { encrypt, decrypt } from '../../utils/encryption'
 
 export class AdminService {
   private static instance: AdminService
@@ -22,6 +24,17 @@ export class AdminService {
     departmentId: string
     password: string
   }) {
+    // Validate password complexity
+    const passwordValidation = validatePasswordComplexity(data.password)
+    if (!passwordValidation.isValid) {
+      throw new Error(`Password requirements not met: ${passwordValidation.errors.join(', ')}`)
+    }
+
+    // Check for common passwords
+    if (isCommonPassword(data.password)) {
+      throw new Error('Password is too common. Please choose a stronger password.')
+    }
+
     // Check if user exists
     const existingUser = await prisma.user.findUnique({
       where: { email: data.email },
@@ -50,11 +63,12 @@ export class AdminService {
         lastName: data.lastName,
         title: data.title,
         email: data.email,
-        phone: data.phone,
+        phone: data.phone ? encrypt(data.phone) : null,
         password: hashedPassword,
         role: data.role as any,
         departmentId: data.departmentId,
         isActive: true,
+        passwordChangedAt: new Date(),
       },
       include: {
         department: true,
@@ -68,7 +82,12 @@ export class AdminService {
       description: `User ${user.email} registered as ${user.role}`,
     })
 
-    return sanitizeUser(user)
+    const sanitizedUser = sanitizeUser(user)
+    if (user.phone) {
+      sanitizedUser.phone = decrypt(user.phone)
+    }
+
+    return sanitizedUser
   }
 
   async getUsers(page: number = 1, limit: number = 10, filters?: any) {
@@ -110,7 +129,13 @@ export class AdminService {
     ])
 
     return {
-      users: users.map(sanitizeUser),
+      users: users.map(user => {
+        const sanitized = sanitizeUser(user)
+        if (user.phone) {
+          sanitized.phone = decrypt(user.phone)
+        }
+        return sanitized
+      }),
       total,
       page,
       limit,
@@ -138,7 +163,12 @@ export class AdminService {
       throw new Error('User not found')
     }
 
-    return sanitizeUser(user)
+    const sanitizedUser = sanitizeUser(user)
+    if (user.phone) {
+      sanitizedUser.phone = decrypt(user.phone)
+    }
+
+    return sanitizedUser
   }
 
   async updateUserStatus(id: string, isActive: boolean) {
@@ -178,10 +208,13 @@ export class AdminService {
       lastName: data.lastName,
       title: data.title,
       email: data.email,
-      phone: data.phone,
       role: data.role as any,
       departmentId: data.departmentId,
       isActive: data.isActive,
+    }
+
+    if (data.phone) {
+      updateData.phone = encrypt(data.phone)
     }
 
     if (data.password) {
@@ -200,7 +233,12 @@ export class AdminService {
       description: `Admin updated user ${user.email}`,
     })
 
-    return sanitizeUser(user)
+    const sanitizedUser = sanitizeUser(user)
+    if (user.phone) {
+      sanitizedUser.phone = decrypt(user.phone)
+    }
+
+    return sanitizedUser
   }
 
   async deleteUser(id: string) {
@@ -283,7 +321,7 @@ export class AdminService {
       prisma.fuelRequest.count({
         where: {
           status: {
-            in: ['PENDING_HEAD_APPROVAL', 'PENDING_TRANSPORT_APPROVAL', 'PENDING_DA_APPROVAL', 'PENDING_FUEL_ISSUANCE'],
+            in: ['PENDING_HEAD_APPROVAL', 'PENDING_TRANSPORT_APPROVAL', 'PENDING_DA_APPROVAL', 'FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE'],
           },
         },
       }),

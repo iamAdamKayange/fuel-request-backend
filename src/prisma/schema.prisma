@@ -30,6 +30,7 @@ enum RequestStatus {
   PENDING_DA_APPROVAL
   ADA_APPROVED
   ADA_REJECTED
+  FULLY_APPROVED
   PENDING_FUEL_ISSUANCE
   COMPLETED
   CANCELLED
@@ -42,6 +43,8 @@ enum AuditAction {
   USER_DEACTIVATED
   USER_ACTIVATED
   USER_ROLE_CHANGED
+  USER_ACCOUNT_LOCKED
+  USER_PASSWORD_CHANGED
   DRIVER_SUBMITTED_REQUEST
   HEAD_APPROVED_REQUEST
   HEAD_REJECTED_REQUEST
@@ -49,6 +52,9 @@ enum AuditAction {
   TRANSPORT_REJECTED_REQUEST
   ADA_APPROVED_REQUEST
   ADA_REJECTED_REQUEST
+  FINAL_APPROVAL_COMPLETED
+  FUEL_PERMIT_PRINTED
+  FUEL_STATEMENT_PRINTED
   FUEL_ISSUED
   REQUEST_CANCELLED
 }
@@ -66,11 +72,15 @@ model User {
   departmentId     String?
   isActive         Boolean         @default(true)
   lastLogin        DateTime?
+  failedLoginAttempts Int          @default(0)
+  lockedUntil      DateTime?
+  passwordChangedAt DateTime?
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 
   department       Department?     @relation(fields: [departmentId], references: [id])
   fuelRequests     FuelRequest[]
+  finalApprovals   FuelRequest[]  @relation("FinalApprover")
   approvals        Approval[]
   fuelIssuances    FuelIssuance[]
   notifications    Notification[]
@@ -81,6 +91,7 @@ model User {
   @@index([email])
   @@index([role])
   @@index([departmentId])
+  @@index([lockedUntil])
 }
 
 model Department {
@@ -135,12 +146,15 @@ model FuelRequest {
   status                RequestStatus   @default(PENDING_HEAD_APPROVAL)
   driverSignature       String
   rejectionReason       String?
+  finalApproverId       String?
+  finalApprovedAt       DateTime?
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
 
   driver                User            @relation(fields: [driverId], references: [id])
   department            Department      @relation(fields: [departmentId], references: [id])
   vehicle               Vehicle         @relation(fields: [vehicleId], references: [id])
+  finalApprover         User?           @relation("FinalApprover", fields: [finalApproverId], references: [id])
   approvals             Approval[]
   fuelIssuance          FuelIssuance?
   notifications         Notification[]
@@ -151,6 +165,11 @@ model FuelRequest {
   @@index([status])
   @@index([departmentId])
   @@index([vehicleId])
+  @@index([finalApproverId])
+  @@index([createdAt])
+  @@index([driverId, status])
+  @@index([departmentId, status])
+  @@index([fuelType])
 }
 
 model Approval {
@@ -211,6 +230,8 @@ model Notification {
   @@index([requestId])
   @@index([isRead])
   @@index([createdAt])
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
 }
 
 model DeviceToken {

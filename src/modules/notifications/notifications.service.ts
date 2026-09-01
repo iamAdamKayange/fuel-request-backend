@@ -1,6 +1,7 @@
 import { prisma } from '../../config/database'
 import { fcm } from '../../config/firebase'
 import { logger } from '../../utils/logger'
+import { webSocketService } from '../websocket/websocket.service'
 
 export class NotificationService {
   private static instance: NotificationService
@@ -19,6 +20,26 @@ export class NotificationService {
     message: string
     type: string
   }) {
+    // Prevent duplicate notifications for the same request, user, and type within 5 minutes
+    if (data.requestId) {
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000)
+      const existingNotification = await prisma.notification.findFirst({
+        where: {
+          userId: data.userId,
+          requestId: data.requestId,
+          type: data.type,
+          createdAt: {
+            gte: fiveMinutesAgo,
+          },
+        },
+      })
+
+      if (existingNotification) {
+        logger.info(`Duplicate notification prevented for user ${data.userId}, request ${data.requestId}, type ${data.type}`)
+        return existingNotification
+      }
+    }
+
     // Save notification to database
     const notification = await prisma.notification.create({
       data: {
@@ -55,12 +76,12 @@ export class NotificationService {
           tokens,
         }
 
-      if (!fcm) {
-  logger.warn('Firebase Messaging is not initialized. Skipping push notification.')
-  return notification
-}
+        if (!fcm) {
+          logger.warn('Firebase Messaging is not initialized. Skipping push notification.')
+          return notification
+        }
 
-const response = await fcm.sendEachForMulticast(message as any)
+        const response = await fcm.sendEachForMulticast(message as any)
 
         // Handle failed tokens
         if (response.failureCount > 0) {
@@ -85,6 +106,20 @@ const response = await fcm.sendEachForMulticast(message as any)
       }
     } catch (error) {
       logger.error('Failed to send push notification:', error)
+    }
+
+    // Send real-time notification via WebSocket
+    try {
+      webSocketService.sendNotificationToUser(data.userId, {
+        id: notification.id,
+        title: data.title,
+        message: data.message,
+        type: data.type,
+        requestId: data.requestId,
+        createdAt: notification.createdAt,
+      })
+    } catch (error) {
+      logger.error('Failed to send WebSocket notification:', error)
     }
 
     return notification

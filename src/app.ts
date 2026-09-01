@@ -7,6 +7,9 @@ import compression from 'compression'
 import { env } from './config/env'
 import { errorHandler } from './middleware/errorHandler'
 import { limiter } from './middleware/rateLimit'
+import { csrfProtection } from './middleware/csrf'
+import { sessionTimeout } from './middleware/sessionTimeout'
+import { prisma } from './config/database'
 
 // Import routes
 import authRoutes from './modules/auth/auth.routes'
@@ -19,6 +22,9 @@ import approvalRoutes from './modules/approvals/approvals.routes'
 import fuelIssuanceRoutes from './modules/fuel-issuance/fuel-issuance.routes'
 import notificationRoutes from './modules/notifications/notifications.routes'
 import auditLogRoutes from './modules/audit-logs/audit-logs.routes'
+import documentRoutes from './modules/document-generation/document-generation.routes'
+import exportRoutes from './modules/exports/exports.routes'
+import analyticsRoutes from './modules/analytics/analytics.routes'
 
 const app = express()
 
@@ -44,6 +50,9 @@ app.set('trust proxy', 1)
 
 // Security middleware
 app.use(helmet())
+
+// CSRF protection
+app.use(csrfProtection)
 
 // CORS
 app.use(
@@ -91,13 +100,74 @@ app.use(
 // Rate limiting
 app.use(limiter)
 
+// Session timeout management
+app.use(sessionTimeout)
+
 // Health check
-app.get('/health', (_req, res) => {
-  res.status(200).json({
-    status: 'ok',
-    environment: env.NODE_ENV,
-    timestamp: new Date().toISOString(),
-  })
+app.get('/health', async (_req, res) => {
+  try {
+    // Check database connection
+    await prisma.$queryRaw`SELECT 1`
+    
+    res.status(200).json({
+      status: 'ok',
+      environment: env.NODE_ENV,
+      timestamp: new Date().toISOString(),
+      database: 'connected',
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+    })
+  } catch (error) {
+    res.status(503).json({
+      status: 'error',
+      environment: env.NODE_ENV,
+      timestamp: new Date().toISOString(),
+      database: 'disconnected',
+      error: 'Database connection failed',
+    })
+  }
+})
+
+// Detailed health check for monitoring
+app.get('/health/detailed', async (_req, res) => {
+  try {
+    // Check database connection with query
+    const dbResult = await prisma.$queryRaw`SELECT NOW() as current_time` as any[]
+    
+    // Get user count
+    const userCount = await prisma.user.count()
+    
+    // Get request count
+    const requestCount = await prisma.fuelRequest.count()
+    
+    res.status(200).json({
+      status: 'ok',
+      environment: env.NODE_ENV,
+      timestamp: new Date().toISOString(),
+      database: {
+        status: 'connected',
+        current_time: dbResult[0]?.current_time,
+      },
+      metrics: {
+        users: userCount,
+        requests: requestCount,
+      },
+      system: {
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+        platform: process.platform,
+        node_version: process.version,
+      },
+    })
+  } catch (error) {
+    res.status(503).json({
+      status: 'error',
+      environment: env.NODE_ENV,
+      timestamp: new Date().toISOString(),
+      database: 'disconnected',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    })
+  }
 })
 
 // API Routes
@@ -120,6 +190,12 @@ app.use('/api/fuel-issuance', fuelIssuanceRoutes)
 app.use('/api/notifications', notificationRoutes)
 
 app.use('/api/audit-logs', auditLogRoutes)
+
+app.use('/api/documents', documentRoutes)
+
+app.use('/api/exports', exportRoutes)
+
+app.use('/api/analytics', analyticsRoutes)
 
 // 404 handler
 app.use((req, res) => {

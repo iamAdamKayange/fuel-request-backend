@@ -1,6 +1,8 @@
 import { prisma } from '../../config/database'
 import { hashPassword, comparePassword, sanitizeUser } from '../../utils/helpers'
 import { logAudit } from '../../utils/logger'
+import { validatePasswordComplexity, isCommonPassword } from '../../utils/password'
+import { encrypt, decrypt } from '../../utils/encryption'
 
 export class UsersService {
   private static instance: UsersService
@@ -47,7 +49,13 @@ export class UsersService {
     ])
 
     return {
-      users: users.map(sanitizeUser),
+      users: users.map(user => {
+        const sanitized = sanitizeUser(user)
+        if (user.phone) {
+          sanitized.phone = decrypt(user.phone)
+        }
+        return sanitized
+      }),
       total,
       page,
       limit,
@@ -67,19 +75,30 @@ export class UsersService {
       throw new Error('User not found')
     }
 
-    return sanitizeUser(user)
+    const sanitizedUser = sanitizeUser(user)
+    if (user.phone) {
+      sanitizedUser.phone = decrypt(user.phone)
+    }
+
+    return sanitizedUser
   }
 
   async updateUser(id: string, data: any) {
+    const updateData: any = {
+      firstName: data.firstName,
+      lastName: data.lastName,
+      departmentId: data.departmentId,
+      isActive: data.isActive,
+    }
+
+    // Encrypt phone number if provided
+    if (data.phone) {
+      updateData.phone = encrypt(data.phone)
+    }
+
     const user = await prisma.user.update({
       where: { id },
-      data: {
-        firstName: data.firstName,
-        lastName: data.lastName,
-        phone: data.phone,
-        departmentId: data.departmentId,
-        isActive: data.isActive,
-      },
+      data: updateData,
       include: {
         department: true,
       },
@@ -92,7 +111,13 @@ export class UsersService {
       description: `User ${user.email} was updated`,
     })
 
-    return sanitizeUser(user)
+    // Decrypt phone for response
+    const sanitizedUser = sanitizeUser(user)
+    if (user.phone) {
+      sanitizedUser.phone = decrypt(user.phone)
+    }
+
+    return sanitizedUser
   }
 
   async updateProfile(userId: string, data: any) {
@@ -146,16 +171,30 @@ export class UsersService {
       throw new Error('Current password is incorrect')
     }
 
+    // Validate new password complexity
+    const passwordValidation = validatePasswordComplexity(newPassword)
+    if (!passwordValidation.isValid) {
+      throw new Error(`Password requirements not met: ${passwordValidation.errors.join(', ')}`)
+    }
+
+    // Check for common passwords
+    if (isCommonPassword(newPassword)) {
+      throw new Error('Password is too common. Please choose a stronger password.')
+    }
+
     const hashedPassword = await hashPassword(newPassword)
 
     await prisma.user.update({
       where: { id: userId },
-      data: { password: hashedPassword },
+      data: { 
+        password: hashedPassword,
+        passwordChangedAt: new Date(),
+      },
     })
 
     await logAudit({
       userId,
-      action: 'USER_CHANGED_PASSWORD' as any,
+      action: 'USER_PASSWORD_CHANGED' as any,
       description: `User ${user.email} changed password`,
     })
 

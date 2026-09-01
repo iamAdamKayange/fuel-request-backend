@@ -37,7 +37,7 @@ export class FuelIssuanceService {
     }
 
     // Check status
-    if (request.status !== 'PENDING_FUEL_ISSUANCE') {
+    if (request.status !== 'PENDING_FUEL_ISSUANCE' && request.status !== 'FULLY_APPROVED') {
       throw new Error('Request is not ready for fuel issuance')
     }
 
@@ -92,6 +92,12 @@ export class FuelIssuanceService {
       include: {
         driver: true,
         department: true,
+        finalApprover: {
+          select: {
+            firstName: true,
+            lastName: true,
+          },
+        },
       },
     })
 
@@ -113,6 +119,17 @@ export class FuelIssuanceService {
       message: `Your request ${request.requestNumber} has been completed. ${data.litresIssued} litres of ${data.fuelType} issued. Token: ${data.tokenNumber}`,
       type: 'REQUEST_COMPLETED',
     })
+
+    // Notify Final Approver that fuel has been issued
+    if (updatedRequest.finalApproverId) {
+      await notificationService.sendNotification({
+        userId: updatedRequest.finalApproverId,
+        requestId,
+        title: 'Fuel Issued for Approved Request',
+        message: `Fuel has been issued for request ${request.requestNumber}. ${data.litresIssued} litres of ${data.fuelType} issued with token ${data.tokenNumber}`,
+        type: 'FUEL_ISSUED',
+      })
+    }
 
     await notificationService.sendToAdmins({
       requestId,

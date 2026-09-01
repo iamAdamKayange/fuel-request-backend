@@ -1,6 +1,8 @@
 import { prisma } from '../../config/database'
 import { logAudit } from '../../utils/logger'
 import { notificationService } from '../notifications/notifications.service'
+import { isEmailConfigured, sendFuelRequestNotification, sendApprovalNotification } from '../../utils/email'
+import { isSMSConfigured, sendFuelRequestSMS, sendApprovalSMS } from '../../utils/sms'
 
 export class ApprovalsService {
   private static instance: ApprovalsService
@@ -92,7 +94,7 @@ export class ApprovalsService {
 
     // Send notifications
     if (data.approved) {
-      // Notify Transport Officer
+      // Notify Transport Officer (NEXT APPROVER - ACTION_REQUIRED)
       const transportOfficers = await prisma.user.findMany({
         where: {
           role: 'TRANSPORT_OFFICER',
@@ -104,28 +106,73 @@ export class ApprovalsService {
         await notificationService.sendNotification({
           userId: officer.id,
           requestId,
-          title: 'Fuel Request Approved by Head',
-          message: `Request ${request.requestNumber} has been approved by Head of Department and requires your review`,
-          type: 'REQUEST_APPROVED',
+          title: 'Fuel Request Pending Transport Approval',
+          message: `Request ${request.requestNumber} from ${request.driver.firstName} ${request.driver.lastName} requires your approval.`,
+          type: 'ACTION_REQUIRED',
         })
+
+        // Send email to Transport Officer if configured
+        if (isEmailConfigured()) {
+          const requesterName = `${request.driver.firstName} ${request.driver.lastName}`
+          await sendApprovalNotification(
+            officer.email,
+            `${officer.firstName} ${officer.lastName}`,
+            request.requestNumber,
+            requesterName,
+            'Transport Officer'
+          )
+        }
+
+        // Send SMS to Transport Officer if configured
+        if (isSMSConfigured() && officer.phone) {
+          const requesterName = `${request.driver.firstName} ${request.driver.lastName}`
+          await sendApprovalSMS(
+            officer.phone,
+            request.requestNumber,
+            requesterName,
+            'Transport Officer'
+          )
+        }
       }
 
+      // Send STATUS_UPDATE to Head (current approver)
       await notificationService.sendNotification({
-        userId: request.driverId,
+        userId: approverId,
         requestId,
-        title: 'Fuel Request Approved',
-        message: `Your request ${request.requestNumber} has been approved by Head of Department and sent to Transport Officer.`,
-        type: 'REQUEST_APPROVED',
+        title: 'Request Approved - Sent to Transport',
+        message: `You approved request ${request.requestNumber}. It has been sent to Transport Officer for review.`,
+        type: 'STATUS_UPDATE',
       })
     } else {
-      // Notify Driver
+      // Notify Driver (applicant) with rejection - STATUS_UPDATE
       await notificationService.sendNotification({
         userId: request.driverId,
         requestId,
         title: 'Fuel Request Rejected',
         message: `Your request ${request.requestNumber} has been rejected by Head of Department. Reason: ${data.reason}`,
-        type: 'REQUEST_REJECTED',
+        type: 'STATUS_UPDATE',
       })
+
+      // Send email to driver if configured
+      if (isEmailConfigured()) {
+        await sendFuelRequestNotification(
+          request.driver.email,
+          `${request.driver.firstName} ${request.driver.lastName}`,
+          request.requestNumber,
+          'HEAD_REJECTED',
+          `rejected by Head of Department. Reason: ${data.reason}`
+        )
+      }
+
+      // Send SMS to driver if configured
+      if (isSMSConfigured() && request.driver.phone) {
+        await sendFuelRequestSMS(
+          request.driver.phone,
+          request.requestNumber,
+          'HEAD_REJECTED',
+          `rejected by Head of Department. Reason: ${data.reason}`
+        )
+      }
     }
 
     await notificationService.sendToAdmins({
@@ -239,7 +286,7 @@ export class ApprovalsService {
 
     // Send notifications
     if (data.approved) {
-      // Notify ADA
+      // Notify ADA (NEXT APPROVER - ACTION_REQUIRED)
       const adaOfficers = await prisma.user.findMany({
         where: {
           role: 'ADA_DAHRM',
@@ -251,28 +298,73 @@ export class ApprovalsService {
         await notificationService.sendNotification({
           userId: officer.id,
           requestId,
-          title: 'Fuel Request Approved by Transport',
-          message: `Request ${request.requestNumber} has been approved by Transport Officer and requires your review`,
-          type: 'REQUEST_APPROVED',
+          title: 'Fuel Request Pending ADA Approval',
+          message: `Request ${request.requestNumber} from ${request.driver.firstName} ${request.driver.lastName} requires your final approval.`,
+          type: 'ACTION_REQUIRED',
         })
+
+        // Send email to ADA if configured
+        if (isEmailConfigured()) {
+          const requesterName = `${request.driver.firstName} ${request.driver.lastName}`
+          await sendApprovalNotification(
+            officer.email,
+            `${officer.firstName} ${officer.lastName}`,
+            request.requestNumber,
+            requesterName,
+            'ADA/DAHRM (Final Approver)'
+          )
+        }
+
+        // Send SMS to ADA if configured
+        if (isSMSConfigured() && officer.phone) {
+          const requesterName = `${request.driver.firstName} ${request.driver.lastName}`
+          await sendApprovalSMS(
+            officer.phone,
+            request.requestNumber,
+            requesterName,
+            'ADA/DAHRM (Final Approver)'
+          )
+        }
       }
 
+      // Send STATUS_UPDATE to Transport Officer (current approver)
       await notificationService.sendNotification({
-        userId: request.driverId,
+        userId: approverId,
         requestId,
-        title: 'Fuel Request Approved',
-        message: `Your request ${request.requestNumber} has been approved by Transport Officer and sent to ADA.`,
-        type: 'REQUEST_APPROVED',
+        title: 'Request Approved - Sent to ADA',
+        message: `You approved request ${request.requestNumber}. It has been sent to ADA for final approval.`,
+        type: 'STATUS_UPDATE',
       })
     } else {
-      // Notify Driver
+      // Notify Driver (applicant) with rejection - STATUS_UPDATE
       await notificationService.sendNotification({
         userId: request.driverId,
         requestId,
         title: 'Fuel Request Rejected',
         message: `Your request ${request.requestNumber} has been rejected by Transport Officer. Reason: ${data.reason}`,
-        type: 'REQUEST_REJECTED',
+        type: 'STATUS_UPDATE',
       })
+
+      // Send email to driver if configured
+      if (isEmailConfigured()) {
+        await sendFuelRequestNotification(
+          request.driver.email,
+          `${request.driver.firstName} ${request.driver.lastName}`,
+          request.requestNumber,
+          'TRANSPORT_REJECTED',
+          `rejected by Transport Officer. Reason: ${data.reason}`
+        )
+      }
+
+      // Send SMS to driver if configured
+      if (isSMSConfigured() && request.driver.phone) {
+        await sendFuelRequestSMS(
+          request.driver.phone,
+          request.requestNumber,
+          'TRANSPORT_REJECTED',
+          `rejected by Transport Officer. Reason: ${data.reason}`
+        )
+      }
     }
 
     await notificationService.sendToAdmins({
@@ -351,7 +443,7 @@ export class ApprovalsService {
       },
     })
 
-    const newStatus = data.approved ? 'PENDING_FUEL_ISSUANCE' : 'ADA_REJECTED'
+    const newStatus = data.approved ? 'FULLY_APPROVED' : 'ADA_REJECTED'
 
     const updateData: any = {
       status: newStatus as any,
@@ -360,6 +452,12 @@ export class ApprovalsService {
 
     if (data.approved && data.litresApproved) {
       updateData.approvedLitres = data.litresApproved
+    }
+
+    // Set final approver info when fully approved
+    if (data.approved) {
+      updateData.finalApproverId = approverId
+      updateData.finalApprovedAt = new Date()
     }
 
     const updatedRequest = await prisma.fuelRequest.update({
@@ -374,55 +472,98 @@ export class ApprovalsService {
     // Log audit
     await logAudit({
       userId: approverId,
-      action: data.approved ? 'ADA_APPROVED_REQUEST' : 'ADA_REJECTED_REQUEST' as any,
+      action: data.approved ? 'FINAL_APPROVAL_COMPLETED' : 'ADA_REJECTED_REQUEST' as any,
       requestId,
       previousStatus: request.status,
       newStatus: newStatus as any,
-      description: `ADA ${approver.email} ${data.approved ? 'approved' : 'rejected'} request ${request.requestNumber}`,
+      description: `ADA ${approver.email} ${data.approved ? 'completed final approval' : 'rejected'} request ${request.requestNumber}`,
     })
 
     // Send notifications
     if (data.approved) {
-      // Notify Procurement
-      const procurementOfficers = await prisma.user.findMany({
-        where: {
-          role: 'PROCUREMENT',
-          isActive: true,
-        },
-      })
-
-      for (const officer of procurementOfficers) {
-        await notificationService.sendNotification({
-          userId: officer.id,
-          requestId,
-          title: 'Fuel Request Approved by ADA',
-          message: `Request ${request.requestNumber} has been approved by ADA and is ready for fuel issuance`,
-          type: 'REQUEST_APPROVED',
-        })
-      }
-
+      // FINAL APPROVAL - Notify Driver (applicant) that request is FULLY_APPROVED - STATUS_UPDATE
       await notificationService.sendNotification({
         userId: request.driverId,
         requestId,
-        title: 'Fuel Request Approved',
-        message: `Your request ${request.requestNumber} has been approved by ADA and sent for fuel issuance.`,
-        type: 'REQUEST_APPROVED',
+        title: 'Fuel Request Fully Approved',
+        message: `Your request ${request.requestNumber} has been fully approved by ${approver.firstName} ${approver.lastName} (ADA/DAHRM). You can now collect the approved documents from the final approver.`,
+        type: 'STATUS_UPDATE',
+      })
+
+      // Send email to driver if configured
+      if (isEmailConfigured()) {
+        await sendFuelRequestNotification(
+          request.driver.email,
+          `${request.driver.firstName} ${request.driver.lastName}`,
+          request.requestNumber,
+          'FULLY_APPROVED',
+          `fully approved by ${approver.firstName} ${approver.lastName} (ADA/DAHRM). Ready for document collection.`
+        )
+      }
+
+      // Send SMS to driver if configured
+      if (isSMSConfigured() && request.driver.phone) {
+        await sendFuelRequestSMS(
+          request.driver.phone,
+          request.requestNumber,
+          'FULLY_APPROVED',
+          `fully approved by ${approver.firstName} ${approver.lastName} (ADA/DAHRM). Ready for document collection.`
+        )
+      }
+
+      // Send STATUS_UPDATE to ADA (final approver) confirming approval
+      await notificationService.sendNotification({
+        userId: approverId,
+        requestId,
+        title: 'Final Approval Completed',
+        message: `You have completed final approval for request ${request.requestNumber}. The request is now FULLY_APPROVED and documents are ready for printing.`,
+        type: 'STATUS_UPDATE',
       })
     } else {
-      // Notify Driver
+      // Notify Driver (applicant) with rejection - STATUS_UPDATE
       await notificationService.sendNotification({
         userId: request.driverId,
         requestId,
         title: 'Fuel Request Rejected',
-        message: `Your request ${request.requestNumber} has been rejected by ADA. Reason: ${data.reason}`,
-        type: 'REQUEST_REJECTED',
+        message: `Your request ${request.requestNumber} has been rejected by ${approver.firstName} ${approver.lastName} (ADA/DAHRM). Reason: ${data.reason}`,
+        type: 'STATUS_UPDATE',
+      })
+
+      // Send email to driver if configured
+      if (isEmailConfigured()) {
+        await sendFuelRequestNotification(
+          request.driver.email,
+          `${request.driver.firstName} ${request.driver.lastName}`,
+          request.requestNumber,
+          'ADA_REJECTED',
+          `rejected by ${approver.firstName} ${approver.lastName} (ADA/DAHRM). Reason: ${data.reason}`
+        )
+      }
+
+      // Send SMS to driver if configured
+      if (isSMSConfigured() && request.driver.phone) {
+        await sendFuelRequestSMS(
+          request.driver.phone,
+          request.requestNumber,
+          'ADA_REJECTED',
+          `rejected by ${approver.firstName} ${approver.lastName} (ADA/DRHM). Reason: ${data.reason}`
+        )
+      }
+
+      // Send STATUS_UPDATE to ADA (current approver) confirming rejection
+      await notificationService.sendNotification({
+        userId: approverId,
+        requestId,
+        title: 'Request Rejected',
+        message: `You have rejected request ${request.requestNumber}. The applicant has been notified.`,
+        type: 'STATUS_UPDATE',
       })
     }
 
     await notificationService.sendToAdmins({
       requestId,
-      title: data.approved ? 'ADA Approved Request' : 'ADA Rejected Request',
-      message: `Request ${request.requestNumber} for ${request.department.name} was ${data.approved ? 'approved' : 'rejected'} by ${approver.email}`,
+      title: data.approved ? 'Final Approval Completed' : 'ADA Rejected Request',
+      message: `Request ${request.requestNumber} for ${request.department.name} was ${data.approved ? 'fully approved' : 'rejected'} by ${approver.email}`,
       type: 'ADMIN_REQUEST_UPDATE',
     })
 

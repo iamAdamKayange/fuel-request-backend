@@ -1,143 +1,263 @@
-import net from 'node:net'
-import tls from 'node:tls'
+import nodemailer from 'nodemailer'
 import { env } from '../config/env'
-import { logger } from './logger'
 
-interface SendEmailInput {
-  to: string
-  subject: string
-  text: string
-}
+let transporter: nodemailer.Transporter | null = null
 
-const CRLF = '\r\n'
-
-function smtpConfigured() {
-  return Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS)
-}
-
-function encode(value: string) {
-  return Buffer.from(value).toString('base64')
-}
-
-function escapeDotLines(value: string) {
-  return value.replace(/^\./gm, '..')
-}
-
-async function readResponse(socket: net.Socket | tls.TLSSocket): Promise<string> {
-  return new Promise((resolve, reject) => {
-    let buffer = ''
-
-    const cleanup = () => {
-      socket.off('data', onData)
-      socket.off('error', onError)
+/**
+ * Get email transporter (lazy initialization)
+ */
+function getTransporter(): nodemailer.Transporter {
+  if (!transporter) {
+    if (!env.SMTP_HOST || !env.SMTP_USER || !env.SMTP_PASS) {
+      throw new Error('SMTP configuration is incomplete')
     }
 
-    const onError = (error: Error) => {
-      cleanup()
-      reject(error)
+    const config: any = {
+      host: env.SMTP_HOST,
+      port: parseInt(env.SMTP_PORT || '587'),
+      auth: {
+        user: env.SMTP_USER,
+        pass: env.SMTP_PASS,
+      },
     }
 
-    const onData = (chunk: Buffer) => {
-      buffer += chunk.toString('utf8')
-      const lines = buffer.split(/\r?\n/).filter(Boolean)
-      const lastLine = lines[lines.length - 1]
+    if (env.SMTP_SECURE === 'true') {
+      config.secure = true
+    }
 
-      if (lastLine && /^\d{3}\s/.test(lastLine)) {
-        cleanup()
-        resolve(buffer)
+    if (env.SMTP_STARTTLS === 'true') {
+      config.tls = {
+        rejectUnauthorized: false,
       }
     }
 
-    socket.on('data', onData)
-    socket.on('error', onError)
-  })
-}
-
-async function command(socket: net.Socket | tls.TLSSocket, value: string, expected: number[]) {
-  socket.write(`${value}${CRLF}`)
-  const response = await readResponse(socket)
-  const code = Number(response.slice(0, 3))
-
-  if (!expected.includes(code)) {
-    throw new Error(`SMTP command failed: ${response.trim()}`)
-  }
-
-  return response
-}
-
-function connectSocket(): Promise<net.Socket | tls.TLSSocket> {
-  const host = env.SMTP_HOST || ''
-  const port = Number(env.SMTP_PORT || (env.SMTP_SECURE === 'true' ? 465 : 587))
-  const options = {
-    host,
-    port,
-    servername: host,
-  }
-
-  return new Promise((resolve, reject) => {
-    let socket: net.Socket | tls.TLSSocket
-
-    socket = env.SMTP_SECURE === 'true'
-      ? tls.connect(options, () => resolve(socket))
-      : net.connect(options, () => resolve(socket))
-
-    socket.once('error', reject)
-  })
-}
-
-export async function sendEmail(input: SendEmailInput) {
-  if (!smtpConfigured()) {
-    return {
-      sent: false,
-      message: 'Email haijatumwa kwa sababu SMTP haijawekwa kwenye environment.',
+    if (env.SMTP_HELO_HOST) {
+      config.heloIdentity = env.SMTP_HELO_HOST
     }
+
+    transporter = nodemailer.createTransport(config)
   }
 
-  let socket = await connectSocket()
+  return transporter
+}
 
+/**
+ * Send email
+ */
+export async function sendEmail(options: {
+  to: string
+  subject: string
+  text: string
+  html?: string
+}): Promise<boolean> {
   try {
-    await readResponse(socket)
-    await command(socket, `EHLO ${env.SMTP_HELO_HOST || 'kibali-mafuta.local'}`, [250])
+    const transporter = getTransporter()
 
-    if (env.SMTP_SECURE !== 'true' && env.SMTP_STARTTLS !== 'false') {
-      await command(socket, 'STARTTLS', [220])
-      socket = tls.connect({ socket, servername: env.SMTP_HOST })
-      await command(socket, `EHLO ${env.SMTP_HELO_HOST || 'kibali-mafuta.local'}`, [250])
+    const mailOptions = {
+      from: env.SMTP_FROM || 'noreply@mafuta.go.tz',
+      to: options.to,
+      subject: options.subject,
+      text: options.text,
+      html: options.html || options.text,
     }
 
-    await command(socket, 'AUTH LOGIN', [334])
-    await command(socket, encode(env.SMTP_USER || ''), [334])
-    await command(socket, encode(env.SMTP_PASS || ''), [235])
-    await command(socket, `MAIL FROM:<${env.SMTP_FROM || env.SMTP_USER}>`, [250])
-    await command(socket, `RCPT TO:<${input.to}>`, [250, 251])
-    await command(socket, 'DATA', [354])
-
-    const from = env.SMTP_FROM || env.SMTP_USER
-    const body = [
-      `From: Kibali Mafuta <${from}>`,
-      `To: ${input.to}`,
-      `Subject: ${input.subject}`,
-      'MIME-Version: 1.0',
-      'Content-Type: text/plain; charset=UTF-8',
-      '',
-      escapeDotLines(input.text),
-      '.',
-    ].join(CRLF)
-
-    await command(socket, body, [250])
-    await command(socket, 'QUIT', [221])
-
-    return {
-      sent: true,
-      message: `Credentials zimetumwa kwenda ${input.to}.`,
-    }
+    await transporter.sendMail(mailOptions)
+    return true
   } catch (error) {
-    logger.error('Failed to send credentials email:', error)
-    return {
-      sent: false,
-      message: 'Mtumiaji amesajiliwa, lakini email ya credentials haikuweza kutumwa.',
-    }
-  } finally {
-    socket.destroy()
+    console.error('Failed to send email:', error)
+    return false
   }
+}
+
+/**
+ * Send fuel request notification
+ */
+export async function sendFuelRequestNotification(
+  recipientEmail: string,
+  recipientName: string,
+  requestNumber: string,
+  status: string,
+  action: string
+): Promise<boolean> {
+  const subject = `Fuel Request ${requestNumber} - ${action}`
+  
+  const text = `
+Dear ${recipientName},
+
+Your fuel request (${requestNumber}) has been ${action}.
+
+Status: ${status}
+
+Please log in to the system for more details.
+
+Best regards,
+Fuel Permit Management System
+  `.trim()
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: #2563eb; color: white; padding: 20px; text-align: center; }
+    .content { padding: 20px; background: #f9fafb; }
+    .status { font-weight: bold; color: #2563eb; }
+    .footer { margin-top: 20px; padding: 10px; text-align: center; font-size: 12px; color: #666; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2>Fuel Request Notification</h2>
+    </div>
+    <div class="content">
+      <p>Dear ${recipientName},</p>
+      <p>Your fuel request (<strong>${requestNumber}</strong>) has been <span class="status">${action}</span>.</p>
+      <p><strong>Status:</strong> ${status}</p>
+      <p>Please log in to the system for more details.</p>
+    </div>
+    <div class="footer">
+      <p>Fuel Permit Management System</p>
+    </div>
+  </div>
+</body>
+</html>
+  `.trim()
+
+  return sendEmail({
+    to: recipientEmail,
+    subject,
+    text,
+    html,
+  })
+}
+
+/**
+ * Send approval notification to approver
+ */
+export async function sendApprovalNotification(
+  recipientEmail: string,
+  recipientName: string,
+  requestNumber: string,
+  requesterName: string,
+  approvalStage: string
+): Promise<boolean> {
+  const subject = `Fuel Request ${requestNumber} - Pending ${approvalStage} Approval`
+  
+  const text = `
+Dear ${recipientName},
+
+A fuel request (${requestNumber}) from ${requesterName} is pending your ${approvalStage} approval.
+
+Please log in to the system to review and approve/reject this request.
+
+Best regards,
+Fuel Permit Management System
+  `.trim()
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: #2563eb; color: white; padding: 20px; text-align: center; }
+    .content { padding: 20px; background: #f9fafb; }
+    .stage { font-weight: bold; color: #dc2626; }
+    .footer { margin-top: 20px; padding: 10px; text-align: center; font-size: 12px; color: #666; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2>Pending Approval Notification</h2>
+    </div>
+    <div class="content">
+      <p>Dear ${recipientName},</p>
+      <p>A fuel request (<strong>${requestNumber}</strong>) from <strong>${requesterName}</strong> is pending your <span class="stage">${approvalStage}</span> approval.</p>
+      <p>Please log in to the system to review and approve/reject this request.</p>
+    </div>
+    <div class="footer">
+      <p>Fuel Permit Management System</p>
+    </div>
+  </div>
+</body>
+</html>
+  `.trim()
+
+  return sendEmail({
+    to: recipientEmail,
+    subject,
+    text,
+    html,
+  })
+}
+
+/**
+ * Send account locked notification
+ */
+export async function sendAccountLockedNotification(
+  recipientEmail: string,
+  recipientName: string
+): Promise<boolean> {
+  const subject = 'Account Locked - Too Many Failed Login Attempts'
+  
+  const text = `
+Dear ${recipientName},
+
+Your account has been locked due to too many failed login attempts.
+
+For security reasons, please contact the administrator to unlock your account.
+
+Best regards,
+Fuel Permit Management System
+  `.trim()
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: #dc2626; color: white; padding: 20px; text-align: center; }
+    .content { padding: 20px; background: #f9fafb; }
+    .warning { font-weight: bold; color: #dc2626; }
+    .footer { margin-top: 20px; padding: 10px; text-align: center; font-size: 12px; color: #666; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2>Account Locked</h2>
+    </div>
+    <div class="content">
+      <p>Dear ${recipientName},</p>
+      <p>Your account has been <span class="warning">locked</span> due to too many failed login attempts.</p>
+      <p>For security reasons, please contact the administrator to unlock your account.</p>
+    </div>
+    <div class="footer">
+      <p>Fuel Permit Management System</p>
+    </div>
+  </div>
+</body>
+</html>
+  `.trim()
+
+  return sendEmail({
+    to: recipientEmail,
+    subject,
+    text,
+    html,
+  })
+}
+
+/**
+ * Check if email service is configured
+ */
+export function isEmailConfigured(): boolean {
+  return !!(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS)
 }

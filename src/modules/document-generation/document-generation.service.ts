@@ -1,0 +1,275 @@
+import { prisma } from '../../config/database'
+import { logAudit } from '../../utils/logger'
+
+export class DocumentGenerationService {
+  private static instance: DocumentGenerationService
+
+  static getInstance(): DocumentGenerationService {
+    if (!DocumentGenerationService.instance) {
+      DocumentGenerationService.instance = new DocumentGenerationService()
+    }
+    return DocumentGenerationService.instance
+  }
+
+  /**
+   * Check if user is authorized to print documents
+   * Only the final approver can print documents
+   */
+  async canPrintDocuments(requestId: string, userId: string): Promise<boolean> {
+    const request = await prisma.fuelRequest.findUnique({
+      where: { id: requestId },
+      select: {
+        status: true,
+        finalApproverId: true,
+      },
+    })
+
+    if (!request) {
+      return false
+    }
+
+    // Can only print if request is fully approved
+    if (request.status !== 'FULLY_APPROVED') {
+      return false
+    }
+
+    // Only final approver can print
+    return request.finalApproverId === userId
+  }
+
+  /**
+   * Generate Fuel Permit document data
+   */
+  async generateFuelPermitData(requestId: string, userId: string) {
+    // Check authorization
+    const canPrint = await this.canPrintDocuments(requestId, userId)
+    if (!canPrint) {
+      throw new Error('You are not authorized to print this document')
+    }
+
+    const request = await prisma.fuelRequest.findUnique({
+      where: { id: requestId },
+      include: {
+        driver: {
+          select: {
+            firstName: true,
+            lastName: true,
+            employeeNumber: true,
+            email: true,
+            phone: true,
+          },
+        },
+        department: true,
+        vehicle: true,
+        finalApprover: {
+          select: {
+            firstName: true,
+            lastName: true,
+            designation: true,
+          },
+        },
+        approvals: {
+          include: {
+            approver: {
+              select: {
+                firstName: true,
+                lastName: true,
+                designation: true,
+              },
+            },
+          },
+          orderBy: { approvedAt: 'asc' },
+        },
+      },
+    })
+
+    if (!request) {
+      throw new Error('Fuel request not found')
+    }
+
+    // Log the print action
+    await logAudit({
+      userId,
+      action: 'FUEL_PERMIT_PRINTED' as any,
+      requestId,
+      description: `Fuel Permit for request ${request.requestNumber} was printed by ${userId}`,
+    })
+
+    return {
+      documentType: 'FUEL_PERMIT',
+      requestNumber: request.requestNumber,
+      issuedDate: request.finalApprovedAt?.toISOString() || new Date().toISOString(),
+      
+      // Driver information
+      driver: {
+        name: `${request.driver.firstName} ${request.driver.lastName}`,
+        employeeNumber: request.driver.employeeNumber,
+        email: request.driver.email,
+        phone: request.driver.phone,
+      },
+      
+      // Department information
+      department: {
+        name: request.department.name,
+      },
+      
+      // Vehicle information
+      vehicle: {
+        number: request.vehicle.vehicleNumber,
+        gpsa: request.vehicle.gpsa,
+        fuelType: request.vehicle.fuelType,
+      },
+      
+      // Fuel details
+      fuel: {
+        type: request.fuelType,
+        requestedLitres: request.requestedLitres,
+        approvedLitres: request.approvedLitres || request.requestedLitres,
+      },
+      
+      // Journey details
+      journey: {
+        purpose: request.purpose,
+        kmFrom: request.kmFrom,
+        kmTo: request.kmTo,
+        kmUsed: request.kmUsed,
+        lastFuelReceived: request.lastFuelReceived,
+      },
+      
+      // Approval chain
+      approvals: request.approvals.map(approval => ({
+        stage: approval.stage,
+        approver: `${approval.approver.firstName} ${approval.approver.lastName}`,
+        designation: approval.approver.designation || approval.stage,
+        approvedAt: approval.approvedAt.toISOString(),
+        litresApproved: approval.litresApproved,
+        signature: approval.signature,
+      })),
+      
+      // Final approver
+      finalApprover: request.finalApprover ? {
+        name: `${request.finalApprover.firstName} ${request.finalApprover.lastName}`,
+        designation: request.finalApprover.designation || 'ADA',
+      } : null,
+    }
+  }
+
+  /**
+   * Generate Fuel Statement document data
+   */
+  async generateFuelStatementData(requestId: string, userId: string) {
+    // Check authorization
+    const canPrint = await this.canPrintDocuments(requestId, userId)
+    if (!canPrint) {
+      throw new Error('You are not authorized to print this document')
+    }
+
+    const request = await prisma.fuelRequest.findUnique({
+      where: { id: requestId },
+      include: {
+        driver: {
+          select: {
+            firstName: true,
+            lastName: true,
+            employeeNumber: true,
+            email: true,
+          },
+        },
+        department: true,
+        vehicle: true,
+        finalApprover: {
+          select: {
+            firstName: true,
+            lastName: true,
+          },
+        },
+        fuelIssuance: {
+          include: {
+            issuer: {
+              select: {
+                firstName: true,
+                lastName: true,
+                designation: true,
+              },
+            },
+          },
+        },
+      },
+    })
+
+    if (!request) {
+      throw new Error('Fuel request not found')
+    }
+
+    // Log the print action
+    await logAudit({
+      userId,
+      action: 'FUEL_STATEMENT_PRINTED' as any,
+      requestId,
+      description: `Fuel Statement for request ${request.requestNumber} was printed by ${userId}`,
+    })
+
+    return {
+      documentType: 'FUEL_STATEMENT',
+      requestNumber: request.requestNumber,
+      generatedDate: new Date().toISOString(),
+      
+      // Driver information
+      driver: {
+        name: `${request.driver.firstName} ${request.driver.lastName}`,
+        employeeNumber: request.driver.employeeNumber,
+        email: request.driver.email,
+      },
+      
+      // Department information
+      department: {
+        name: request.department.name,
+      },
+      
+      // Vehicle information
+      vehicle: {
+        number: request.vehicle.vehicleNumber,
+        gpsa: request.vehicle.gpsa,
+        fuelType: request.vehicle.fuelType,
+      },
+      
+      // Fuel request details
+      request: {
+        fuelType: request.fuelType,
+        requestedLitres: request.requestedLitres,
+        approvedLitres: request.approvedLitres || request.requestedLitres,
+        issuedLitres: request.issuedLitres,
+        purpose: request.purpose,
+        requestDate: request.requestDate.toISOString(),
+        finalApprovedAt: request.finalApprovedAt?.toISOString(),
+      },
+      
+      // Journey details
+      journey: {
+        kmFrom: request.kmFrom,
+        kmTo: request.kmTo,
+        kmUsed: request.kmUsed,
+        lastFuelReceived: request.lastFuelReceived,
+      },
+      
+      // Fuel issuance info (if available)
+      issuance: request.fuelIssuance ? {
+        issuedBy: `${request.fuelIssuance.issuer.firstName} ${request.fuelIssuance.issuer.lastName}`,
+        designation: request.fuelIssuance.issuer.designation,
+        litresIssued: request.fuelIssuance.litresIssued,
+        tokenNumber: request.fuelIssuance.tokenNumber,
+        issuedAt: request.fuelIssuance.issuedAt.toISOString(),
+      } : null,
+      
+      // Final approver
+      finalApprover: request.finalApprover ? {
+        name: `${request.finalApprover.firstName} ${request.finalApprover.lastName}`,
+      } : null,
+      
+      // Status
+      status: request.status,
+    }
+  }
+}
+
+export const documentGenerationService = DocumentGenerationService.getInstance()

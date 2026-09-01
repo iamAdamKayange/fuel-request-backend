@@ -132,12 +132,22 @@ export class FuelRequestsService {
       description: `Driver ${driver.email} submitted fuel request ${fuelRequest.requestNumber}`,
     })
 
-    // Send notification to the selected department/unit heads.
-    await notificationService.sendToDepartmentHeads(targetDepartment.id, {
+    // Send notification to the Head of Department (FIRST APPROVER - ACTION_REQUIRED)
+    await notificationService.sendNotification({
+      userId: headOfDepartment.id,
       requestId: fuelRequest.id,
-      title: 'New Fuel Request',
-      message: `New fuel request ${fuelRequest.requestNumber} from ${driver.firstName} ${driver.lastName} was sent to ${targetDepartment.name} and requires approval`,
-      type: 'REQUEST_SUBMITTED',
+      title: 'New Fuel Request Pending Your Approval',
+      message: `New fuel request ${fuelRequest.requestNumber} from ${driver.firstName} ${driver.lastName} (${driver.employeeNumber}) requires your approval.`,
+      type: 'ACTION_REQUIRED',
+    })
+
+    // Send STATUS_UPDATE to Driver (applicant) confirming submission
+    await notificationService.sendNotification({
+      userId: driverId,
+      requestId: fuelRequest.id,
+      title: 'Fuel Request Submitted',
+      message: `Your fuel request ${fuelRequest.requestNumber} has been submitted to ${headOfDepartment.firstName} ${headOfDepartment.lastName} (Head of Department) for approval.`,
+      type: 'STATUS_UPDATE',
     })
 
     await notificationService.sendToAdmins({
@@ -169,7 +179,7 @@ export class FuelRequestsService {
         where.status = 'PENDING_HEAD_APPROVAL'
       }
     } else if (role === 'PROCUREMENT') {
-      where.status = 'PENDING_FUEL_ISSUANCE'
+      where.status = { in: ['FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE'] }
     }
 
     if (filters?.status) {
@@ -207,17 +217,57 @@ export class FuelRequestsService {
       ]
     }
 
+    // Optimize query by selecting only needed fields
     const [requests, total] = await Promise.all([
       prisma.fuelRequest.findMany({
         where,
-        include: {
+        select: {
+          id: true,
+          requestNumber: true,
+          status: true,
+          fuelType: true,
+          requestedLitres: true,
+          approvedLitres: true,
+          issuedLitres: true,
+          createdAt: true,
           driver: {
-            include: { department: true },
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              employeeNumber: true,
+            },
           },
-          department: true,
-          vehicle: true,
-          approvals: true,
-          fuelIssuance: true,
+          department: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          vehicle: {
+            select: {
+              id: true,
+              vehicleNumber: true,
+              fuelType: true,
+            },
+          },
+          approvals: {
+            select: {
+              id: true,
+              stage: true,
+              approved: true,
+              approvedAt: true,
+              approver: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                },
+              },
+            },
+            orderBy: { approvedAt: 'asc' },
+          },
         },
         skip,
         take: limit,
@@ -304,6 +354,7 @@ export class FuelRequestsService {
         'PENDING_DA_APPROVAL',
         'ADA_APPROVED',
         'ADA_REJECTED',
+        'FULLY_APPROVED',
         'PENDING_FUEL_ISSUANCE',
         'COMPLETED',
         'CANCELLED',
@@ -312,11 +363,13 @@ export class FuelRequestsService {
         'PENDING_DA_APPROVAL',
         'ADA_APPROVED',
         'ADA_REJECTED',
+        'FULLY_APPROVED',
         'PENDING_FUEL_ISSUANCE',
         'COMPLETED',
         'CANCELLED',
       ],
       PROCUREMENT: [
+        'FULLY_APPROVED',
         'PENDING_FUEL_ISSUANCE',
         'COMPLETED',
         'CANCELLED',
