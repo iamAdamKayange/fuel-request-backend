@@ -1,157 +1,71 @@
 #!/bin/bash
 
-# ============================================================
-# Kibali cha Kuchukua Mafuta - PostgreSQL Restore Script
-# Designed for Neon PostgreSQL
-# ============================================================
+# Database Restore Script for Kibali cha Kuchukua Mafuta
+# Restores a PostgreSQL database from a compressed backup file
 
-set -u
-
-# Configuration
-DATABASE_URL="${DATABASE_URL:-}"
-
-# ------------------------------------------------------------
-# Check DATABASE_URL
-# ------------------------------------------------------------
-if [ -z "${DATABASE_URL}" ]; then
-    echo "ERROR: DATABASE_URL is not set."
-    exit 1
-fi
-
-# ------------------------------------------------------------
-# Check backup argument
-# ------------------------------------------------------------
-if [ -z "${1:-}" ]; then
-
-    echo "Usage:"
-    echo "$0 <backup_file.sql.gz>"
-
-    echo ""
-    echo "Example:"
-    echo "$0 ./backups/kibali_mafuta_backup_20260901_120000.sql.gz"
-
-    exit 1
-
-fi
-
-BACKUP_FILE="$1"
-
-# ------------------------------------------------------------
-# Check backup file
-# ------------------------------------------------------------
-if [ ! -f "${BACKUP_FILE}" ]; then
-
-    echo "ERROR: Backup file not found:"
-    echo "${BACKUP_FILE}"
-
-    exit 1
-
-fi
-
-# ------------------------------------------------------------
-# Check required commands
-# ------------------------------------------------------------
-if ! command -v psql >/dev/null 2>&1; then
-
-    echo "ERROR: psql is not installed or not available in PATH."
-
-    exit 1
-
-fi
-
-if ! command -v gzip >/dev/null 2>&1; then
-
-    echo "ERROR: gzip is not installed or not available in PATH."
-
-    exit 1
-
-fi
-
-# ------------------------------------------------------------
-# Temporary restore file
-# ------------------------------------------------------------
-TEMP_FILE=$(mktemp)
-
-# Cleanup temporary file when script exits
-cleanup() {
-    rm -f "${TEMP_FILE}"
-}
-
-trap cleanup EXIT
+set -e
 
 echo "============================================================"
 echo "Starting database restore..."
 echo "============================================================"
-echo "Backup file: ${BACKUP_FILE}"
 
-# ------------------------------------------------------------
-# Verify backup integrity
-# ------------------------------------------------------------
+# Check DATABASE_URL
+if [ -z "$DATABASE_URL" ]; then
+    echo "ERROR: DATABASE_URL is not set!"
+    exit 1
+fi
+
+# Check backup file argument
+if [ -z "$1" ]; then
+    echo "Usage: $0 <backup_file.sql.gz>"
+    echo ""
+    echo "Example:"
+    echo "$0 kibali_mafuta_backup_20260901_120000.sql.gz"
+    exit 1
+fi
+
+BACKUP_FILE="$1"
+
+# Check backup file exists
+if [ ! -f "$BACKUP_FILE" ]; then
+    echo "ERROR: Backup file not found:"
+    echo "$BACKUP_FILE"
+    exit 1
+fi
+
+echo "Backup file:"
+echo "$BACKUP_FILE"
+
+# Check backup integrity
+echo ""
 echo "Checking backup integrity..."
 
-if ! gzip -t "${BACKUP_FILE}"; then
+gunzip -t "$BACKUP_FILE"
 
-    echo "ERROR: Backup file is corrupted or invalid."
+echo "Backup integrity check: PASSED"
 
-    exit 1
+# Create temporary SQL file
+TEMP_FILE="/tmp/kibali_mafuta_restore_$(date +%s).sql"
 
-fi
-
-echo "Backup integrity: PASSED"
-
-# ------------------------------------------------------------
-# Decompress backup
-# ------------------------------------------------------------
+echo ""
 echo "Decompressing backup..."
 
-if ! gunzip -c "${BACKUP_FILE}" > "${TEMP_FILE}"; then
+gunzip -c "$BACKUP_FILE" > "$TEMP_FILE"
 
-    echo "ERROR: Failed to decompress backup."
+echo "Backup decompressed successfully."
 
-    exit 1
-
-fi
-
-# ------------------------------------------------------------
-# Confirmation
-# ------------------------------------------------------------
-echo ""
-echo "WARNING!"
-echo "This will restore data into the PostgreSQL database"
-echo "specified by DATABASE_URL."
-echo ""
-read -r -p "Continue with database restore? (yes/no): " CONFIRM
-
-if [ "${CONFIRM}" != "yes" ]; then
-
-    echo "Restore cancelled."
-
-    exit 0
-
-fi
-
-# ------------------------------------------------------------
 # Restore database
-# ------------------------------------------------------------
 echo ""
 echo "Restoring database..."
 
-if psql "${DATABASE_URL}" < "${TEMP_FILE}"; then
+psql "$DATABASE_URL" < "$TEMP_FILE"
 
-    echo ""
-    echo "============================================================"
-    echo "DATABASE RESTORE COMPLETED SUCCESSFULLY"
-    echo "============================================================"
+echo ""
+echo "Cleaning temporary files..."
 
-else
+rm -f "$TEMP_FILE"
 
-    echo ""
-    echo "============================================================"
-    echo "ERROR: DATABASE RESTORE FAILED"
-    echo "============================================================"
-
-    exit 1
-
-fi
-
-exit 0
+echo ""
+echo "============================================================"
+echo "DATABASE RESTORE COMPLETED SUCCESSFULLY"
+echo "============================================================"
