@@ -15,15 +15,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup PostgreSQL 18
-        uses: tj-actions/install-postgresql@v4
-        with:
-          postgresql-version: "18"
-
-      - name: Verify PostgreSQL version
+      - name: Verify PostgreSQL 18 client
         run: |
-          which pg_dump
-          pg_dump --version
+          docker run --rm postgres:18 pg_dump --version
 
       - name: Make backup script executable
         run: chmod +x scripts/backup-database.sh
@@ -31,4 +25,17 @@ jobs:
       - name: Run database backup
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: ./scripts/backup-database.sh
+        run: |
+          docker run --rm \
+            -e DATABASE_URL="$DATABASE_URL" \
+            -v "${{ github.workspace }}/scripts:/scripts:ro" \
+            -v "${{ github.workspace }}/backups:/backups" \
+            postgres:18 \
+            bash -c '
+              chmod +x /scripts/backup-database.sh
+              BACKUP_DIR=/backups /scripts/backup-database.sh
+            '
+
+      - name: List backup files
+        run: |
+          ls -lh backups/
