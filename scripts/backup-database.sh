@@ -1,116 +1,105 @@
 #!/bin/bash
 
-# ============================================================
-# Kibali cha Kuchukua Mafuta - PostgreSQL Backup Script
-# Designed for Neon PostgreSQL
-# ============================================================
+# Database Backup Script for Kibali cha Kuchukua Mafuta
 
-set -u
+set -e
+
+echo "============================================================"
+echo "Starting database backup..."
+echo "============================================================"
+
+# Check required environment variables
+if [ -z "$DATABASE_URL" ]; then
+    echo "ERROR: DATABASE_URL is not set!"
+    exit 1
+fi
+
+if [ -z "$R2_ACCESS_KEY_ID" ]; then
+    echo "ERROR: R2_ACCESS_KEY_ID is not set!"
+    exit 1
+fi
+
+if [ -z "$R2_SECRET_ACCESS_KEY" ]; then
+    echo "ERROR: R2_SECRET_ACCESS_KEY is not set!"
+    exit 1
+fi
+
+if [ -z "$R2_ENDPOINT" ]; then
+    echo "ERROR: R2_ENDPOINT is not set!"
+    exit 1
+fi
+
+if [ -z "$R2_BUCKET" ]; then
+    echo "ERROR: R2_BUCKET is not set!"
+    exit 1
+fi
 
 # Configuration
-DATABASE_URL="${DATABASE_URL:-}"
 BACKUP_DIR="${BACKUP_DIR:-./backups}"
 RETENTION_DAYS="${RETENTION_DAYS:-7}"
 
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 BACKUP_FILE="${BACKUP_DIR}/kibali_mafuta_backup_${TIMESTAMP}.sql"
-COMPRESSED_FILE="${BACKUP_FILE}.gz"
 
-# ------------------------------------------------------------
-# Check DATABASE_URL
-# ------------------------------------------------------------
-if [ -z "${DATABASE_URL}" ]; then
-    echo "ERROR: DATABASE_URL is not set."
-    exit 1
-fi
-
-# ------------------------------------------------------------
-# Check required commands
-# ------------------------------------------------------------
-if ! command -v pg_dump >/dev/null 2>&1; then
-    echo "ERROR: pg_dump is not installed or not available in PATH."
-    exit 1
-fi
-
-if ! command -v gzip >/dev/null 2>&1; then
-    echo "ERROR: gzip is not installed or not available in PATH."
-    exit 1
-fi
-
-# ------------------------------------------------------------
-# Create backup directory
-# ------------------------------------------------------------
 mkdir -p "${BACKUP_DIR}"
 
-echo "============================================================"
-echo "Starting database backup..."
-echo "============================================================"
-echo "Backup file: ${COMPRESSED_FILE}"
+echo "Backup file: ${BACKUP_FILE}"
 echo "Retention: ${RETENTION_DAYS} days"
 
-# ------------------------------------------------------------
 # Create PostgreSQL backup
-# ------------------------------------------------------------
-if pg_dump "${DATABASE_URL}" > "${BACKUP_FILE}"; then
+echo ""
+echo "Creating PostgreSQL backup..."
 
-    echo "Database dump created successfully."
+pg_dump "$DATABASE_URL" > "${BACKUP_FILE}"
 
-else
+echo "Database dump created successfully."
 
-    echo "ERROR: Database backup failed!"
-
-    rm -f "${BACKUP_FILE}"
-
-    exit 1
-
-fi
-
-# ------------------------------------------------------------
 # Compress backup
-# ------------------------------------------------------------
-if gzip "${BACKUP_FILE}"; then
+echo ""
+echo "Compressing backup..."
 
-    echo "Backup compressed successfully:"
-    echo "${COMPRESSED_FILE}"
+gzip "${BACKUP_FILE}"
 
-else
+BACKUP_FILE_GZ="${BACKUP_FILE}.gz"
 
-    echo "ERROR: Backup compression failed!"
+echo "Backup compressed successfully:"
+echo "${BACKUP_FILE_GZ}"
 
-    rm -f "${BACKUP_FILE}"
-    exit 1
+# Verify backup integrity
+echo ""
+echo "Checking backup integrity..."
 
-fi
+gunzip -t "${BACKUP_FILE_GZ}"
 
-# ------------------------------------------------------------
-# Verify compressed backup
-# ------------------------------------------------------------
-if gzip -t "${COMPRESSED_FILE}"; then
+echo "Backup integrity check: PASSED"
 
-    echo "Backup integrity check: PASSED"
+# Upload to Cloudflare R2
+echo ""
+echo "Uploading backup to Cloudflare R2..."
 
-else
+export AWS_ACCESS_KEY_ID="${R2_ACCESS_KEY_ID}"
+export AWS_SECRET_ACCESS_KEY="${R2_SECRET_ACCESS_KEY}"
 
-    echo "ERROR: Backup integrity check FAILED!"
+aws s3 cp \
+    "${BACKUP_FILE_GZ}" \
+    "s3://${R2_BUCKET}/$(basename "${BACKUP_FILE_GZ}")" \
+    --endpoint-url "${R2_ENDPOINT}"
 
-    rm -f "${COMPRESSED_FILE}"
-    exit 1
+echo "Backup uploaded successfully to Cloudflare R2."
 
-fi
+# Remove local backups older than retention period
+echo ""
+echo "Cleaning old local backups..."
 
-# ------------------------------------------------------------
-# Remove old backups
-# ------------------------------------------------------------
 find "${BACKUP_DIR}" \
     -name "kibali_mafuta_backup_*.sql.gz" \
     -type f \
-    -mtime +"${RETENTION_DAYS}" \
+    -mtime +${RETENTION_DAYS} \
     -delete
 
-echo "Old backups removed."
+echo "Old local backups removed."
 
+echo ""
 echo "============================================================"
 echo "BACKUP COMPLETED SUCCESSFULLY"
 echo "============================================================"
-
-exit 0
