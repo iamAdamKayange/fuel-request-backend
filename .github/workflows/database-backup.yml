@@ -2,7 +2,6 @@ name: Database Backup
 
 on:
   schedule:
-    # 23:00 UTC = 02:00 Tanzania time
     - cron: "0 23 * * *"
 
   workflow_dispatch:
