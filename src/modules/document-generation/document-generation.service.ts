@@ -65,7 +65,7 @@ export class DocumentGenerationService {
           select: {
             firstName: true,
             lastName: true,
-            designation: true,
+            title: true,
           },
         },
         approvals: {
@@ -74,7 +74,7 @@ export class DocumentGenerationService {
               select: {
                 firstName: true,
                 lastName: true,
-                designation: true,
+                title: true,
               },
             },
           },
@@ -140,7 +140,7 @@ export class DocumentGenerationService {
       approvals: request.approvals.map(approval => ({
         stage: approval.stage,
         approver: `${approval.approver.firstName} ${approval.approver.lastName}`,
-        designation: approval.approver.designation || approval.stage,
+        designation: approval.approver.title || approval.stage,
         approvedAt: approval.approvedAt.toISOString(),
         litresApproved: approval.litresApproved,
         signature: approval.signature,
@@ -149,7 +149,7 @@ export class DocumentGenerationService {
       // Final approver
       finalApprover: request.finalApprover ? {
         name: `${request.finalApprover.firstName} ${request.finalApprover.lastName}`,
-        designation: request.finalApprover.designation || 'ADA',
+        designation: request.finalApprover.title || 'ADA',
       } : null,
     }
   }
@@ -183,17 +183,7 @@ export class DocumentGenerationService {
             lastName: true,
           },
         },
-        fuelIssuance: {
-          include: {
-            issuer: {
-              select: {
-                firstName: true,
-                lastName: true,
-                designation: true,
-              },
-            },
-          },
-        },
+        fuelIssuance: true,
       },
     })
 
@@ -254,8 +244,6 @@ export class DocumentGenerationService {
       
       // Fuel issuance info (if available)
       issuance: request.fuelIssuance ? {
-        issuedBy: `${request.fuelIssuance.issuer.firstName} ${request.fuelIssuance.issuer.lastName}`,
-        designation: request.fuelIssuance.issuer.designation,
         litresIssued: request.fuelIssuance.litresIssued,
         tokenNumber: request.fuelIssuance.tokenNumber,
         issuedAt: request.fuelIssuance.issuedAt.toISOString(),
