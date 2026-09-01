@@ -1,8 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "commonjs",
     "lib": ["ES2020"],
     "outDir": "./dist",
     "rootDir": "./src",
@@ -27,7 +26,7 @@
   "exclude": ["node_modules", "dist", "**/*.test.ts"],
   "ts-node": {
     "compilerOptions": {
-      "module": "CommonJS"
+      "module": "commonjs"
     }
   }
 }
