@@ -29,20 +29,36 @@ export const encrypt = (text: string): string => {
   return Buffer.concat([salt, iv, tag, encrypted]).toString('base64')
 }
 
-export const decrypt = (encryptedData: string): string => {
-  const buffer = Buffer.from(encryptedData, 'base64')
-  
-  const salt = buffer.subarray(0, SALT_LENGTH)
-  const iv = buffer.subarray(SALT_LENGTH, TAG_POSITION)
-  const tag = buffer.subarray(TAG_POSITION, ENCRYPTED_POSITION)
-  const encrypted = buffer.subarray(ENCRYPTED_POSITION)
-  
-  const key = getKey(salt)
-  
-  const decipher = crypto.createDecipheriv(ALGORITHM, key, iv)
-  decipher.setAuthTag(tag)
-  
-  return decipher.update(encrypted) + decipher.final('utf8')
+export const decrypt = (encryptedData: string): string | null => {
+  try {
+    // Check if data is empty or not a string
+    if (!encryptedData || typeof encryptedData !== 'string') {
+      return null
+    }
+
+    const buffer = Buffer.from(encryptedData, 'base64')
+    
+    // Check if buffer is too short to contain salt + iv + tag + encrypted data
+    const minRequiredLength = SALT_LENGTH + IV_LENGTH + TAG_LENGTH
+    if (buffer.length < minRequiredLength) {
+      return null
+    }
+    
+    const salt = buffer.subarray(0, SALT_LENGTH)
+    const iv = buffer.subarray(SALT_LENGTH, TAG_POSITION)
+    const tag = buffer.subarray(TAG_POSITION, ENCRYPTED_POSITION)
+    const encrypted = buffer.subarray(ENCRYPTED_POSITION)
+    
+    const key = getKey(salt)
+    
+    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv)
+    decipher.setAuthTag(tag)
+    
+    return decipher.update(encrypted) + decipher.final('utf8')
+  } catch (error) {
+    // Return null if decryption fails (data might be corrupted or not encrypted)
+    return null
+  }
 }
 
 export const hash = (text: string): string => {

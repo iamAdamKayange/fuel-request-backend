@@ -52,7 +52,8 @@ export class UsersService {
       users: users.map(user => {
         const sanitized = sanitizeUser(user)
         if (user.phone) {
-          sanitized.phone = decrypt(user.phone)
+          const decryptedPhone = decrypt(user.phone)
+          sanitized.phone = decryptedPhone || 'N/A'
         }
         return sanitized
       }),
@@ -77,7 +78,8 @@ export class UsersService {
 
     const sanitizedUser = sanitizeUser(user)
     if (user.phone) {
-      sanitizedUser.phone = decrypt(user.phone)
+      const decryptedPhone = decrypt(user.phone)
+      sanitizedUser.phone = decryptedPhone || 'N/A'
     }
 
     return sanitizedUser
@@ -114,7 +116,8 @@ export class UsersService {
     // Decrypt phone for response
     const sanitizedUser = sanitizeUser(user)
     if (user.phone) {
-      sanitizedUser.phone = decrypt(user.phone)
+      const decryptedPhone = decrypt(user.phone)
+      sanitizedUser.phone = decryptedPhone || 'N/A'
     }
 
     return sanitizedUser
