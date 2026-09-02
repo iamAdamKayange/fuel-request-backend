@@ -36,6 +36,7 @@ const allowedOrigins = new Set(
 
 // Add common Vercel preview domains in production
 if (env.NODE_ENV === 'production') {
+  allowedOrigins.add('https://kibali-cha-kuchukua-mafuta.vercel.app')
   allowedOrigins.add('https://kibali-cha-kuchukua-mafuta-git-main-adam-kayange.vercel.app')
   allowedOrigins.add('https://kibali-cha-kuchukua-mafuta-afvm90jqn-adam-kayange.vercel.app')
 }
