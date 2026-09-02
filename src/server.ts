@@ -12,7 +12,13 @@ async function startServer() {
     await runDatabaseMigrations()
 
     // Connect to database before starting HTTP server
-    await connectDatabase()
+    try {
+      await connectDatabase()
+      console.log('Database connected successfully')
+    } catch (dbError) {
+      console.error('Failed to connect to database:', dbError)
+      console.log('Starting server without database connection (health check will fail)')
+    }
 
     const server = app.listen(PORT, () => {
       console.log(`Server running on http://localhost:${PORT}`)
