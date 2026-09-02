@@ -48,9 +48,9 @@ if (env.NODE_ENV === 'development') {
 }
 
 /**
- * Render / Reverse Proxy configuration
+ * Reverse Proxy configuration
  *
- * Render sits behind a proxy and sends X-Forwarded-For.
+ * Railway (and other platforms) sit behind a proxy and send X-Forwarded-For.
  * Trust the first proxy so Express and express-rate-limit
  * can correctly determine the client IP.
  */
