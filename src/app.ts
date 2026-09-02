@@ -34,6 +34,12 @@ const allowedOrigins = new Set(
     .filter(Boolean)
 )
 
+// Add common Vercel preview domains in production
+if (env.NODE_ENV === 'production') {
+  allowedOrigins.add('https://kibali-cha-kuchukua-mafuta-git-main-adam-kayange.vercel.app')
+  allowedOrigins.add('https://kibali-cha-kuchukua-mafuta-afvm90jqn-adam-kayange.vercel.app')
+}
+
 if (env.NODE_ENV === 'development') {
   allowedOrigins.add('http://localhost:3000')
   allowedOrigins.add('http://127.0.0.1:3000')
@@ -70,6 +76,14 @@ app.use(
         return
       }
 
+      // Allow all origins in development for testing
+      if (env.NODE_ENV === 'development') {
+        console.log(`CORS allowing origin in development: ${origin}`)
+        callback(null, true)
+        return
+      }
+
+      console.error(`CORS blocked origin: ${origin}`)
       callback(new Error(`CORS blocked origin: ${origin}`))
     },
     credentials: true,
