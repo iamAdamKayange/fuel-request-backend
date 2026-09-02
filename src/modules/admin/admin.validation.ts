@@ -53,11 +53,16 @@ export const deleteAdminUserSchema = z.object({
 
 export const adminUsersSchema = z.object({
   query: z.object({
-    page: z.string().optional().transform(Number),
-    limit: z.string().optional().transform(Number),
+    page: z.string().optional().transform(val => val ? Number(val) : undefined),
+    limit: z.string().optional().transform(val => val ? Number(val) : undefined),
     role: z.string().optional(),
     departmentId: z.string().optional(),
     search: z.string().optional(),
-    isActive: z.string().optional().transform(val => val === 'true'),
+    isActive: z.union([z.string(), z.boolean(), z.undefined()]).optional().transform(val => {
+      if (typeof val === 'boolean') return val
+      if (val === 'true') return true
+      if (val === 'false') return false
+      return undefined
+    }),
   }),
 })
