@@ -59,7 +59,7 @@ app.set('trust proxy', 1)
 // Security middleware
 app.use(helmet())
 
-// CSRF protection
+// CSRF protection (now lenient for Railway reverse proxy)
 app.use(csrfProtection)
 
 // CORS
@@ -116,7 +116,7 @@ app.use(
 // Rate limiting
 app.use(limiter)
 
-// Session timeout management
+// Session timeout management (JWT-based, no express-session required)
 app.use(sessionTimeout)
 
 // Root endpoint
