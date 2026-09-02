@@ -23,7 +23,6 @@ export const requireAuth = async (
     // Get token from header
     const authHeader = req.headers.authorization
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.log('[Auth] No Bearer token in Authorization header')
       res.status(401).json(errorResponse('Authentication required'))
       return
     }
@@ -31,46 +30,23 @@ export const requireAuth = async (
     const token = authHeader.replace('Bearer ', '')
 
     if (!token) {
-      console.log('[Auth] Empty token after Bearer prefix')
       res.status(401).json(errorResponse('Authentication required'))
       return
     }
 
-    // Debug: Log token presence without exposing it
-    console.log('[Auth] Token received:', {
-      hasToken: !!token,
-      tokenLength: token.length,
-      tokenPrefix: token.substring(0, 10) + '...'
-    })
-
     // Ensure secret is string
     const secret = env.JWT_ACCESS_SECRET?.toString()
     if (!secret) {
-      console.error('[Auth] JWT_ACCESS_SECRET is not defined')
+      console.error('JWT_ACCESS_SECRET is not defined')
       res.status(500).json(errorResponse('Server configuration error'))
       return
     }
-
-    console.log('[Auth] JWT_SECRET configured:', {
-      hasSecret: !!secret,
-      secretLength: secret.length,
-      env: env.NODE_ENV
-    })
 
     // Verify token
     let decoded: any
     try {
       decoded = jwt.verify(token, secret)
-      console.log('[Auth] Token verified successfully:', {
-        userId: decoded.id,
-        email: decoded.email,
-        role: decoded.role
-      })
     } catch (jwtError: any) {
-      console.log('[Auth] Token verification failed:', {
-        errorName: jwtError.name,
-        errorMessage: jwtError.message
-      })
       if (jwtError.name === 'JsonWebTokenError') {
         res.status(401).json(errorResponse('Invalid token'))
         return
