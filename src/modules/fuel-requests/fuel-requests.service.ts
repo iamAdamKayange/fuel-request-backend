@@ -221,6 +221,27 @@ export class FuelRequestsService {
       ]
     }
 
+    // Helper function to get rejection details
+    const getRejectionDetails = (request: any) => {
+      if (!request.status.includes('REJECTED')) return null
+      
+      const rejectedApproval = request.approvals?.find((a: any) => !a.approved)
+      if (!rejectedApproval) return null
+      
+      const roleMap: Record<string, string> = {
+        HEAD: 'Head of Department',
+        TRANSPORT: 'Transport Officer',
+        ADA: 'ADA/DAHRM'
+      }
+      
+      return {
+        rejectedBy: roleMap[rejectedApproval.stage] || rejectedApproval.stage,
+        rejectedByUser: `${rejectedApproval.approver.firstName} ${rejectedApproval.approver.lastName}`,
+        reason: rejectedApproval.reason || 'No reason provided',
+        rejectedAt: rejectedApproval.approvedAt
+      }
+    }
+
     // Optimize query by selecting only needed fields
     const [requests, total] = await Promise.all([
       prisma.fuelRequest.findMany({
@@ -233,6 +254,7 @@ export class FuelRequestsService {
           requestedLitres: true,
           approvedLitres: true,
           issuedLitres: true,
+          rejectionReason: true,
           createdAt: true,
           driver: {
             select: {
@@ -262,11 +284,13 @@ export class FuelRequestsService {
               stage: true,
               approved: true,
               approvedAt: true,
+              reason: true,
               approver: {
                 select: {
                   id: true,
                   firstName: true,
                   lastName: true,
+                  role: true,
                 },
               },
             },
@@ -280,8 +304,14 @@ export class FuelRequestsService {
       prisma.fuelRequest.count({ where }),
     ])
 
+    // Add rejection details to each request
+    const requestsWithRejectionDetails = requests.map(request => ({
+      ...request,
+      rejectionDetails: getRejectionDetails(request)
+    }))
+
     return {
-      requests,
+      requests: requestsWithRejectionDetails,
       total,
       page,
       limit,
@@ -306,6 +336,7 @@ export class FuelRequestsService {
                 firstName: true,
                 lastName: true,
                 email: true,
+                role: true,
               },
             },
           },
@@ -411,7 +442,31 @@ export class FuelRequestsService {
       throw new Error('This request is not assigned to your workflow stage')
     }
 
-    return request
+    // Add rejection details
+    const getRejectionDetails = (request: any) => {
+      if (!request.status.includes('REJECTED')) return null
+      
+      const rejectedApproval = request.approvals?.find((a: any) => !a.approved)
+      if (!rejectedApproval) return null
+      
+      const roleMap: Record<string, string> = {
+        HEAD: 'Head of Department',
+        TRANSPORT: 'Transport Officer',
+        ADA: 'ADA/DAHRM'
+      }
+      
+      return {
+        rejectedBy: roleMap[rejectedApproval.stage] || rejectedApproval.stage,
+        rejectedByUser: `${rejectedApproval.approver.firstName} ${rejectedApproval.approver.lastName}`,
+        reason: rejectedApproval.reason || 'No reason provided',
+        rejectedAt: rejectedApproval.approvedAt
+      }
+    }
+
+    return {
+      ...request,
+      rejectionDetails: getRejectionDetails(request)
+    }
   }
 
   async updateFuelRequest(id: string, data: {
