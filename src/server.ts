@@ -20,8 +20,8 @@ async function startServer() {
       console.log('Starting server without database connection (health check will fail)')
     }
 
-    const server = app.listen(PORT, () => {
-      console.log(`Server running on http://localhost:${PORT}`)
+    const server = app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server running on port ${PORT}`)
       console.log(`Environment: ${env.NODE_ENV}`)
     })
 
