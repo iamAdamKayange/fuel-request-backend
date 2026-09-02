@@ -20,7 +20,8 @@ export async function sendSMS(options: {
     // Decrypt phone number if it's encrypted
     let phoneNumber = options.to
     try {
-      phoneNumber = decrypt(options.to)
+      const decryptedPhone = decrypt(options.to)
+      phoneNumber = decryptedPhone || options.to
     } catch (error) {
       // If decryption fails, assume it's not encrypted
       phoneNumber = options.to

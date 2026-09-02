@@ -187,7 +187,11 @@ export class FuelRequestsService {
     } else if (role === 'TRANSPORT_OFFICER') {
       where.status = 'PENDING_TRANSPORT_APPROVAL'
     } else if (role === 'ADA_DAHRM') {
-      where.status = 'PENDING_DA_APPROVAL'
+      // ADA/DAHRM sees both pending approval and fully approved requests they've processed
+      where.status = { in: ['PENDING_DA_APPROVAL', 'FULLY_APPROVED'] }
+    } else if (role === 'DRIVER') {
+      // Driver sees their own requests including rejected ones
+      where.status = { in: ['PENDING_HEAD_APPROVAL', 'HEAD_REJECTED', 'PENDING_TRANSPORT_APPROVAL', 'TRANSPORT_REJECTED', 'PENDING_DA_APPROVAL', 'ADA_REJECTED', 'FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE', 'COMPLETED', 'CANCELLED'] }
     }
 
     if (filters?.departmentId) {
@@ -347,6 +351,33 @@ export class FuelRequestsService {
     }
 
     const allowedStatusByRole: Record<string, string[]> = {
+      DRIVER: [
+        'PENDING_HEAD_APPROVAL',
+        'HEAD_REJECTED',
+        'PENDING_TRANSPORT_APPROVAL',
+        'TRANSPORT_REJECTED',
+        'PENDING_DA_APPROVAL',
+        'ADA_REJECTED',
+        'FULLY_APPROVED',
+        'PENDING_FUEL_ISSUANCE',
+        'COMPLETED',
+        'CANCELLED',
+      ],
+      HEAD_OF_DEPARTMENT: [
+        'PENDING_HEAD_APPROVAL',
+        'HEAD_APPROVED',
+        'HEAD_REJECTED',
+        'PENDING_TRANSPORT_APPROVAL',
+        'TRANSPORT_APPROVED',
+        'TRANSPORT_REJECTED',
+        'PENDING_DA_APPROVAL',
+        'ADA_APPROVED',
+        'ADA_REJECTED',
+        'FULLY_APPROVED',
+        'PENDING_FUEL_ISSUANCE',
+        'COMPLETED',
+        'CANCELLED',
+      ],
       TRANSPORT_OFFICER: [
         'PENDING_TRANSPORT_APPROVAL',
         'TRANSPORT_APPROVED',
