@@ -30,6 +30,19 @@ export class ApprovalsService {
       include: {
         driver: true,
         department: true,
+        approvals: {
+          include: {
+            approver: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+          orderBy: { approvedAt: 'asc' },
+        },
       },
     })
 
@@ -173,6 +186,18 @@ export class ApprovalsService {
           `rejected by Head of Department. Reason: ${data.reason}`
         )
       }
+
+      // Notify previous approvers (Transport and ADA if they had approved earlier)
+      const previousApprovers = request.approvals?.filter((a: any) => a.approved && a.stage !== 'HEAD') || []
+      for (const prevApproval of previousApprovers) {
+        await notificationService.sendNotification({
+          userId: prevApproval.approverId,
+          requestId,
+          title: 'Request Rejected by Head',
+          message: `Request ${request.requestNumber} that you previously approved has been rejected by Head of Department. Reason: ${data.reason}`,
+          type: 'STATUS_UPDATE',
+        })
+      }
     }
 
     await notificationService.sendToAdmins({
@@ -207,6 +232,19 @@ export class ApprovalsService {
       include: {
         driver: true,
         department: true,
+        approvals: {
+          include: {
+            approver: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+          orderBy: { approvedAt: 'asc' },
+        },
       },
     })
 
@@ -365,6 +403,18 @@ export class ApprovalsService {
           `rejected by Transport Officer. Reason: ${data.reason}`
         )
       }
+
+      // Notify previous approvers (Head and ADA if they had approved earlier)
+      const previousApprovers = request.approvals?.filter((a: any) => a.approved && a.stage !== 'TRANSPORT') || []
+      for (const prevApproval of previousApprovers) {
+        await notificationService.sendNotification({
+          userId: prevApproval.approverId,
+          requestId,
+          title: 'Request Rejected by Transport',
+          message: `Request ${request.requestNumber} that you previously approved has been rejected by Transport Officer. Reason: ${data.reason}`,
+          type: 'STATUS_UPDATE',
+        })
+      }
     }
 
     await notificationService.sendToAdmins({
@@ -397,6 +447,19 @@ export class ApprovalsService {
       include: {
         driver: true,
         department: true,
+        approvals: {
+          include: {
+            approver: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+          orderBy: { approvedAt: 'asc' },
+        },
       },
     })
 
@@ -548,6 +611,18 @@ export class ApprovalsService {
           'ADA_REJECTED',
           `rejected by ${approver.firstName} ${approver.lastName} (ADA/DRHM). Reason: ${data.reason}`
         )
+      }
+
+      // Notify previous approvers (Head and Transport if they had approved earlier)
+      const previousApprovers = request.approvals?.filter((a: any) => a.approved && a.stage !== 'ADA') || []
+      for (const prevApproval of previousApprovers) {
+        await notificationService.sendNotification({
+          userId: prevApproval.approverId,
+          requestId,
+          title: 'Request Rejected by ADA',
+          message: `Request ${request.requestNumber} that you previously approved has been rejected by ADA/DAHRM. Reason: ${data.reason}`,
+          type: 'STATUS_UPDATE',
+        })
       }
 
       // Send STATUS_UPDATE to ADA (current approver) confirming rejection

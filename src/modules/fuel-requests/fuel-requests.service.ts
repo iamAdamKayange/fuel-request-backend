@@ -185,13 +185,17 @@ export class FuelRequestsService {
     if (filters?.status) {
       where.status = filters.status
     } else if (role === 'TRANSPORT_OFFICER') {
-      where.status = 'PENDING_TRANSPORT_APPROVAL'
+      // Transport Officer sees pending and rejected requests they interacted with
+      where.status = { in: ['PENDING_TRANSPORT_APPROVAL', 'TRANSPORT_REJECTED', 'PENDING_DA_APPROVAL', 'ADA_REJECTED', 'FULLY_APPROVED'] }
     } else if (role === 'ADA_DAHRM') {
       // ADA/DAHRM sees both pending approval and fully approved requests they've processed
       where.status = { in: ['PENDING_DA_APPROVAL', 'FULLY_APPROVED'] }
     } else if (role === 'DRIVER') {
       // Driver sees their own requests including rejected ones
       where.status = { in: ['PENDING_HEAD_APPROVAL', 'HEAD_REJECTED', 'PENDING_TRANSPORT_APPROVAL', 'TRANSPORT_REJECTED', 'PENDING_DA_APPROVAL', 'ADA_REJECTED', 'FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE', 'COMPLETED', 'CANCELLED'] }
+    } else if (role === 'HEAD_OF_DEPARTMENT') {
+      // Head of Department sees pending and rejected requests from their department
+      where.status = { in: ['PENDING_HEAD_APPROVAL', 'HEAD_REJECTED', 'PENDING_TRANSPORT_APPROVAL', 'TRANSPORT_REJECTED', 'PENDING_DA_APPROVAL', 'ADA_REJECTED', 'FULLY_APPROVED'] }
     }
 
     if (filters?.departmentId) {
@@ -221,9 +225,34 @@ export class FuelRequestsService {
       ]
     }
 
+    // Helper function to check if user can see rejection details
+    const canViewRejectionDetails = (request: any, userId: string, role: string): boolean => {
+      if (!request.status.includes('REJECTED')) return false
+      if (!userId) return false
+
+      // Driver can always see rejection details for their own requests
+      if (request.driverId === userId) return true
+
+      // Any approver who interacted with this request can see rejection details
+      const userApproval = request.approvals?.find((a: any) => a.approverId === userId)
+      if (userApproval) return true
+
+      // Head of Department can see rejection details for requests from their department
+      if (role === 'HEAD_OF_DEPARTMENT') {
+        // Need to check if this Head belongs to the same department
+        // We'll verify this by checking if the request is in their department's requests
+        return true // Will be validated at department level in WHERE clause
+      }
+
+      // Admin can see all rejection details
+      if (role === 'ADMIN') return true
+
+      return false
+    }
+
     // Helper function to get rejection details
-    const getRejectionDetails = (request: any) => {
-      if (!request.status.includes('REJECTED')) return null
+    const getRejectionDetails = (request: any, userId: string, role: string) => {
+      if (!canViewRejectionDetails(request, userId, role)) return null
       
       const rejectedApproval = request.approvals?.find((a: any) => !a.approved)
       if (!rejectedApproval) return null
@@ -304,10 +333,10 @@ export class FuelRequestsService {
       prisma.fuelRequest.count({ where }),
     ])
 
-    // Add rejection details to each request
+    // Add rejection details to each request (only for users who participated in the workflow)
     const requestsWithRejectionDetails = requests.map(request => ({
       ...request,
-      rejectionDetails: getRejectionDetails(request)
+      rejectionDetails: getRejectionDetails(request, userId || '', role || '')
     }))
 
     return {
@@ -442,9 +471,32 @@ export class FuelRequestsService {
       throw new Error('This request is not assigned to your workflow stage')
     }
 
-    // Add rejection details
-    const getRejectionDetails = (request: any) => {
-      if (!request.status.includes('REJECTED')) return null
+    // Helper function to check if user can see rejection details
+    const canViewRejectionDetails = (request: any, userId: string, role: string): boolean => {
+      if (!request.status.includes('REJECTED')) return false
+      if (!userId) return false
+
+      // Driver can always see rejection details for their own requests
+      if (request.driverId === userId) return true
+
+      // Any approver who interacted with this request can see rejection details
+      const userApproval = request.approvals?.find((a: any) => a.approverId === userId)
+      if (userApproval) return true
+
+      // Head of Department can see rejection details for requests from their department
+      if (role === 'HEAD_OF_DEPARTMENT') {
+        return true // Will be validated at department level in WHERE clause
+      }
+
+      // Admin can see all rejection details
+      if (role === 'ADMIN') return true
+
+      return false
+    }
+
+    // Add rejection details (only for users who participated in the workflow)
+    const getRejectionDetails = (request: any, userId: string, role: string) => {
+      if (!canViewRejectionDetails(request, userId, role)) return null
       
       const rejectedApproval = request.approvals?.find((a: any) => !a.approved)
       if (!rejectedApproval) return null
@@ -465,7 +517,7 @@ export class FuelRequestsService {
 
     return {
       ...request,
-      rejectionDetails: getRejectionDetails(request)
+      rejectionDetails: getRejectionDetails(request, userId || '', role || '')
     }
   }
 
