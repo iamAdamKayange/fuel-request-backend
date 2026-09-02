@@ -39,6 +39,7 @@ if (env.NODE_ENV === 'production') {
   allowedOrigins.add('https://kibali-cha-kuchukua-mafuta.vercel.app')
   allowedOrigins.add('https://kibali-cha-kuchukua-mafuta-git-main-adam-kayange.vercel.app')
   allowedOrigins.add('https://kibali-cha-kuchukua-mafuta-afvm90jqn-adam-kayange.vercel.app')
+  allowedOrigins.add('https://fuel-request-backend-production.up.railway.app')
 }
 
 if (env.NODE_ENV === 'development') {
