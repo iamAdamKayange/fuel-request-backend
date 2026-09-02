@@ -217,8 +217,26 @@ export class AuthService {
       departmentId: user.departmentId,
     }
 
+    // Debug: Log token generation
+    console.log('[AuthService] Generating access token:', {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      expiresIn,
+      hasSecret: !!secret,
+      secretLength: secret.length,
+      env: env.NODE_ENV
+    })
+
     // Fix: Use correct jwt.sign signature
-    return jwt.sign(payload, secret, { expiresIn } as jwt.SignOptions)
+    const token = jwt.sign(payload, secret, { expiresIn } as jwt.SignOptions)
+    
+    console.log('[AuthService] Access token generated:', {
+      tokenLength: token.length,
+      tokenPrefix: token.substring(0, 10) + '...'
+    })
+    
+    return token
   }
 
   private async generateRefreshToken(userId: string): Promise<string> {

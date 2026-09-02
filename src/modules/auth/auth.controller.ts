@@ -17,8 +17,22 @@ export class AuthController {
     try {
       const { email, password } = req.body
       const result = await authService.login(email, password, req)
+      
+      // Debug: Log login response
+      console.log('[AuthController] Login successful:', {
+        hasAccessToken: !!result.accessToken,
+        accessTokenLength: result.accessToken?.length,
+        accessTokenPrefix: result.accessToken?.substring(0, 10) + '...',
+        hasRefreshToken: !!result.refreshToken,
+        userRole: result.user?.role,
+        userId: result.user?.id
+      })
+      
       res.json(successResponse(result, 'Login successful'))
     } catch (error: any) {
+      console.log('[AuthController] Login failed:', {
+        error: error.message
+      })
       res.status(401).json(errorResponse(error.message))
     }
   }
