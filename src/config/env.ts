@@ -6,7 +6,7 @@ dotenv.config()
 const envSchema = z.object({
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
 
-  DIRECT_URL: z.string().min(1, 'DIRECT_URL is required'),
+  DIRECT_URL: z.string().min(1, 'DIRECT_URL is required').optional(),
 
   JWT_ACCESS_SECRET: z
     .string()
