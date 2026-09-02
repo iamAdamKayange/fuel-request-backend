@@ -1,0 +1,112 @@
+name: Database Restore
+
+on:
+  workflow_dispatch:
+    inputs:
+      backup_file:
+        description: "Backup filename from Cloudflare R2"
+        required: true
+        type: string
+
+      confirm_restore:
+        description: "Type RESTORE to confirm database restore"
+        required: true
+        type: string
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify restore confirmation
+        run: |
+          if [ "${{ inputs.confirm_restore }}" != "RESTORE" ]; then
+            echo "ERROR: Restore confirmation failed."
+            echo "You must type RESTORE exactly."
+            exit 1
+          fi
+
+          echo "Restore confirmation accepted."
+
+      - name: Install PostgreSQL 18 client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl ca-certificates lsb-release
+
+          sudo install -d /usr/share/postgresql-common/pgdg
+
+          sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
+
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-18
+
+          psql --version
+          pg_restore --version
+
+      - name: Install AWS CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y awscli
+
+          aws --version
+
+      - name: Create backup directory
+        run: |
+          mkdir -p backups
+
+      - name: Download backup from Cloudflare R2
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          echo "Downloading backup from Cloudflare R2..."
+
+          export AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID"
+          export AWS_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY"
+
+          aws s3 cp \
+            "s3://${R2_BUCKET}/${{ inputs.backup_file }}" \
+            "backups/${{ inputs.backup_file }}" \
+            --endpoint-url "$R2_ENDPOINT"
+
+          echo "Backup downloaded successfully."
+
+      - name: Verify backup file
+        run: |
+          if [ ! -f "backups/${{ inputs.backup_file }}" ]; then
+            echo "ERROR: Backup file was not downloaded."
+            exit 1
+          fi
+
+          echo "Backup file:"
+          ls -lh "backups/${{ inputs.backup_file }}"
+
+          echo "Checking backup integrity..."
+
+          gunzip -t "backups/${{ inputs.backup_file }}"
+
+          echo "Backup integrity check: PASSED."
+
+      - name: Restore database
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          chmod +x scripts/restore-database.sh
+
+          ./scripts/restore-database.sh \
+            "backups/${{ inputs.backup_file }}"
+
+      - name: Restore completed
+        run: |
+          echo "============================================================"
+          echo "DATABASE RESTORE COMPLETED"
+          echo "============================================================"
