@@ -118,6 +118,20 @@ app.use(limiter)
 // Session timeout management
 app.use(sessionTimeout)
 
+// Root endpoint
+app.get('/', (_req, res) => {
+  res.json({
+    message: 'Kibali cha Kuchukua Mafuta - Fuel Permit Management System API',
+    version: '1.4.0',
+    status: 'running',
+    endpoints: {
+      health: '/health',
+      api: '/api',
+      documentation: 'API documentation available at /api routes',
+    },
+  })
+})
+
 // Health check
 app.get('/health', async (_req, res) => {
   try {
