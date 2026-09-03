@@ -23,9 +23,16 @@ export class DocumentGenerationController {
         req.user!.id
       )
       
-      res.json(successResponse(documentData, 'Fuel Permit generated successfully'))
+      return res.json(successResponse(documentData, 'Fuel Permit generated successfully'))
     } catch (error: any) {
-      res.status(400).json(errorResponse(error.message))
+      // Handle different error types with appropriate status codes
+      if (error.name === 'AUTHORIZATION_ERROR') {
+        return res.status(403).json(errorResponse(error.message))
+      }
+      if (error.message?.includes('not found')) {
+        return res.status(404).json(errorResponse(error.message))
+      }
+      return res.status(400).json(errorResponse(error.message))
     }
   }
 
@@ -39,9 +46,16 @@ export class DocumentGenerationController {
         req.user!.id
       )
       
-      res.json(successResponse(documentData, 'Fuel Statement generated successfully'))
+      return res.json(successResponse(documentData, 'Fuel Statement generated successfully'))
     } catch (error: any) {
-      res.status(400).json(errorResponse(error.message))
+      // Handle different error types with appropriate status codes
+      if (error.name === 'AUTHORIZATION_ERROR') {
+        return res.status(403).json(errorResponse(error.message))
+      }
+      if (error.message?.includes('not found')) {
+        return res.status(404).json(errorResponse(error.message))
+      }
+      return res.status(400).json(errorResponse(error.message))
     }
   }
 
@@ -50,12 +64,12 @@ export class DocumentGenerationController {
       const { id } = req.params
       const requestId = Array.isArray(id) ? id[0] : id
       
-      const canPrint = await documentGenerationService.canPrintDocuments(
+      const result = await documentGenerationService.canPrintDocuments(
         requestId,
         req.user!.id
       )
       
-      res.json(successResponse({ canPrint }, 'Print permission checked'))
+      res.json(successResponse({ canPrint: result.canPrint, reason: result.reason }, 'Print permission checked'))
     } catch (error: any) {
       res.status(400).json(errorResponse(error.message))
     }

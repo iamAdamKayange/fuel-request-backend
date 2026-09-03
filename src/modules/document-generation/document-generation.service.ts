@@ -15,7 +15,7 @@ export class DocumentGenerationService {
    * Check if user is authorized to print documents
    * Only the final approver can print documents
    */
-  async canPrintDocuments(requestId: string, userId: string): Promise<boolean> {
+  async canPrintDocuments(requestId: string, userId: string): Promise<{ canPrint: boolean; reason?: string }> {
     const request = await prisma.fuelRequest.findUnique({
       where: { id: requestId },
       select: {
@@ -25,16 +25,20 @@ export class DocumentGenerationService {
     })
 
     if (!request) {
-      return false
+      return { canPrint: false, reason: 'Fuel request not found' }
     }
 
     // Can only print if request is fully approved
     if (request.status !== 'FULLY_APPROVED') {
-      return false
+      return { canPrint: false, reason: `Request is not fully approved (current status: ${request.status})` }
     }
 
     // Only final approver can print
-    return request.finalApproverId === userId
+    if (request.finalApproverId !== userId) {
+      return { canPrint: false, reason: 'Only the final approver can print this document' }
+    }
+
+    return { canPrint: true }
   }
 
   /**
@@ -42,9 +46,11 @@ export class DocumentGenerationService {
    */
   async generateFuelPermitData(requestId: string, userId: string) {
     // Check authorization
-    const canPrint = await this.canPrintDocuments(requestId, userId)
-    if (!canPrint) {
-      throw new Error('You are not authorized to print this document')
+    const authResult = await this.canPrintDocuments(requestId, userId)
+    if (!authResult.canPrint) {
+      const error = new Error(authResult.reason || 'You are not authorized to print this document')
+      error.name = 'AUTHORIZATION_ERROR'
+      throw error
     }
 
     const request = await prisma.fuelRequest.findUnique({
@@ -159,9 +165,11 @@ export class DocumentGenerationService {
    */
   async generateFuelStatementData(requestId: string, userId: string) {
     // Check authorization
-    const canPrint = await this.canPrintDocuments(requestId, userId)
-    if (!canPrint) {
-      throw new Error('You are not authorized to print this document')
+    const authResult = await this.canPrintDocuments(requestId, userId)
+    if (!authResult.canPrint) {
+      const error = new Error(authResult.reason || 'You are not authorized to print this document')
+      error.name = 'AUTHORIZATION_ERROR'
+      throw error
     }
 
     const request = await prisma.fuelRequest.findUnique({

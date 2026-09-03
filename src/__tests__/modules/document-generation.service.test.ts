@@ -17,15 +17,17 @@ describe('DocumentGenerationService', () => {
 
   describe('canPrintDocuments', () => {
     it('should return false for non-existent request', async () => {
-      const canPrint = await service.canPrintDocuments('non-existent-id', 'user-123')
-      expect(canPrint).toBe(false)
+      const result = await service.canPrintDocuments('non-existent-id', 'user-123')
+      expect(result.canPrint).toBe(false)
+      expect(result.reason).toBe('Fuel request not found')
     })
 
     it('should return false when user is not final approver', async () => {
       // This test would need a real database setup
       // For now, we test the error case
-      const canPrint = await service.canPrintDocuments('non-existent-id', 'user-123')
-      expect(canPrint).toBe(false)
+      const result = await service.canPrintDocuments('non-existent-id', 'user-123')
+      expect(result.canPrint).toBe(false)
+      expect(result.reason).toBeDefined()
     })
   })
 
