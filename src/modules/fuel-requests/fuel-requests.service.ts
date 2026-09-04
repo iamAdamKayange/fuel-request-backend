@@ -599,6 +599,8 @@ export class FuelRequestsService {
       data: {
         status: 'CANCELLED',
         rejectionReason: reason,
+        finalApproverId: null,
+        finalApprovedAt: null,
       },
     })
 

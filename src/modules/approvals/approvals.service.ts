@@ -83,12 +83,20 @@ export class ApprovalsService {
 
     const newStatus = data.approved ? 'PENDING_TRANSPORT_APPROVAL' : 'HEAD_REJECTED'
 
+    const updateData: any = {
+      status: newStatus as any,
+      rejectionReason: data.approved ? undefined : data.reason,
+    }
+
+    // Clear final approver info if rejected
+    if (!data.approved) {
+      updateData.finalApproverId = null
+      updateData.finalApprovedAt = null
+    }
+
     const updatedRequest = await prisma.fuelRequest.update({
       where: { id: requestId },
-      data: {
-        status: newStatus as any,
-        rejectionReason: data.approved ? undefined : data.reason,
-      },
+      data: updateData,
       include: {
         driver: true,
         department: true,
@@ -301,6 +309,12 @@ export class ApprovalsService {
 
     if (data.approved && data.litresApproved) {
       updateData.approvedLitres = data.litresApproved
+    }
+
+    // Clear final approver info if rejected
+    if (!data.approved) {
+      updateData.finalApproverId = null
+      updateData.finalApprovedAt = null
     }
 
     const updatedRequest = await prisma.fuelRequest.update({
@@ -521,6 +535,10 @@ export class ApprovalsService {
     if (data.approved) {
       updateData.finalApproverId = approverId
       updateData.finalApprovedAt = new Date()
+    } else {
+      // Clear final approver info if rejected
+      updateData.finalApproverId = null
+      updateData.finalApprovedAt = null
     }
 
     const updatedRequest = await prisma.fuelRequest.update({

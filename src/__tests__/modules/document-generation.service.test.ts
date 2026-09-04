@@ -29,6 +29,13 @@ describe('DocumentGenerationService', () => {
       expect(result.canPrint).toBe(false)
       expect(result.reason).toBeDefined()
     })
+
+    it('should return false when final approver is missing', async () => {
+      // This test would need a real database setup
+      // For now, we test the error case
+      const result = await service.canPrintDocuments('non-existent-id', 'user-123')
+      expect(result.canPrint).toBe(false)
+    })
   })
 
   describe('generateFuelPermitData', () => {

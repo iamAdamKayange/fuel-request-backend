@@ -33,9 +33,14 @@ export class DocumentGenerationService {
       return { canPrint: false, reason: `Request is not fully approved (current status: ${request.status})` }
     }
 
+    // Final approver must be set
+    if (!request.finalApproverId) {
+      return { canPrint: false, reason: 'Final approver information is missing' }
+    }
+
     // Only final approver can print
     if (request.finalApproverId !== userId) {
-      return { canPrint: false, reason: 'Only the final approver can print this document' }
+      return { canPrint: false, reason: 'Only the user who completed the final approval can print this document' }
     }
 
     return { canPrint: true }

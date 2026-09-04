@@ -27,12 +27,24 @@ export class DocumentGenerationController {
     } catch (error: any) {
       // Handle different error types with appropriate status codes
       if (error.name === 'AUTHORIZATION_ERROR') {
-        return res.status(403).json(errorResponse(error.message))
+        return res.status(403).json({
+          success: false,
+          message: error.message,
+          code: 'PRINT_PERMISSION_DENIED'
+        })
       }
       if (error.message?.includes('not found')) {
-        return res.status(404).json(errorResponse(error.message))
+        return res.status(404).json({
+          success: false,
+          message: error.message,
+          code: 'DOCUMENT_NOT_FOUND'
+        })
       }
-      return res.status(400).json(errorResponse(error.message))
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+        code: 'DOCUMENT_GENERATION_ERROR'
+      })
     }
   }
 
@@ -50,12 +62,24 @@ export class DocumentGenerationController {
     } catch (error: any) {
       // Handle different error types with appropriate status codes
       if (error.name === 'AUTHORIZATION_ERROR') {
-        return res.status(403).json(errorResponse(error.message))
+        return res.status(403).json({
+          success: false,
+          message: error.message,
+          code: 'PRINT_PERMISSION_DENIED'
+        })
       }
       if (error.message?.includes('not found')) {
-        return res.status(404).json(errorResponse(error.message))
+        return res.status(404).json({
+          success: false,
+          message: error.message,
+          code: 'DOCUMENT_NOT_FOUND'
+        })
       }
-      return res.status(400).json(errorResponse(error.message))
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+        code: 'DOCUMENT_GENERATION_ERROR'
+      })
     }
   }
 
@@ -69,9 +93,9 @@ export class DocumentGenerationController {
         req.user!.id
       )
       
-      res.json(successResponse({ canPrint: result.canPrint, reason: result.reason }, 'Print permission checked'))
+      return res.json(successResponse(result, 'Print permission checked'))
     } catch (error: any) {
-      res.status(400).json(errorResponse(error.message))
+      return res.status(400).json(errorResponse(error.message))
     }
   }
 }
