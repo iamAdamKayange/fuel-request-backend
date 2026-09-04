@@ -176,26 +176,31 @@ export class FuelRequestsService {
         where.departmentId = user.departmentId
       }
       if (!filters?.status) {
-        where.status = 'PENDING_HEAD_APPROVAL'
+        // By default, show pending and all statuses (including rejected) for department
+        // Rejected requests they interacted with will be included
+        where.status = { in: ['PENDING_HEAD_APPROVAL', 'HEAD_REJECTED', 'PENDING_TRANSPORT_APPROVAL', 'TRANSPORT_REJECTED', 'PENDING_DA_APPROVAL', 'ADA_REJECTED', 'FULLY_APPROVED'] }
       }
     } else if (role === 'PROCUREMENT') {
-      where.status = { in: ['FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE'] }
+      if (!filters?.status) {
+        // PROCUREMENT sees fully approved, pending fuel issuance, and rejected requests they interacted with
+        where.status = { in: ['FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE', 'COMPLETED'] }
+      }
     }
 
     if (filters?.status) {
       where.status = filters.status
     } else if (role === 'TRANSPORT_OFFICER') {
       // Transport Officer sees pending and rejected requests they interacted with
-      where.status = { in: ['PENDING_TRANSPORT_APPROVAL', 'TRANSPORT_REJECTED', 'PENDING_DA_APPROVAL', 'ADA_REJECTED', 'FULLY_APPROVED'] }
+      where.status = { in: ['PENDING_TRANSPORT_APPROVAL', 'TRANSPORT_REJECTED', 'PENDING_DA_APPROVAL', 'ADA_REJECTED', 'FULLY_APPROVED', 'COMPLETED'] }
     } else if (role === 'ADA_DAHRM') {
-      // ADA/DAHRM sees both pending approval and fully approved requests they've processed
-      where.status = { in: ['PENDING_DA_APPROVAL', 'FULLY_APPROVED'] }
+      // ADA/DAHRM sees pending approval, fully approved, and rejected requests they interacted with
+      where.status = { in: ['PENDING_DA_APPROVAL', 'ADA_REJECTED', 'FULLY_APPROVED', 'COMPLETED'] }
     } else if (role === 'DRIVER') {
       // Driver sees their own requests including rejected ones
       where.status = { in: ['PENDING_HEAD_APPROVAL', 'HEAD_REJECTED', 'PENDING_TRANSPORT_APPROVAL', 'TRANSPORT_REJECTED', 'PENDING_DA_APPROVAL', 'ADA_REJECTED', 'FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE', 'COMPLETED', 'CANCELLED'] }
     } else if (role === 'HEAD_OF_DEPARTMENT') {
       // Head of Department sees pending and rejected requests from their department
-      where.status = { in: ['PENDING_HEAD_APPROVAL', 'HEAD_REJECTED', 'PENDING_TRANSPORT_APPROVAL', 'TRANSPORT_REJECTED', 'PENDING_DA_APPROVAL', 'ADA_REJECTED', 'FULLY_APPROVED'] }
+      where.status = { in: ['PENDING_HEAD_APPROVAL', 'HEAD_REJECTED', 'PENDING_TRANSPORT_APPROVAL', 'TRANSPORT_REJECTED', 'PENDING_DA_APPROVAL', 'ADA_REJECTED', 'FULLY_APPROVED', 'COMPLETED'] }
     }
 
     if (filters?.departmentId) {
@@ -222,6 +227,24 @@ export class FuelRequestsService {
         { driver: { firstName: { contains: filters.search, mode: 'insensitive' } } },
         { driver: { lastName: { contains: filters.search, mode: 'insensitive' } } },
         { vehicle: { vehicleNumber: { contains: filters.search, mode: 'insensitive' } } },
+      ]
+    }
+
+    // For approvers (HEAD_OF_DEPARTMENT, TRANSPORT_OFFICER, ADA_DAHRM, PROCUREMENT),
+    // always include requests they have interacted with (have an approval record)
+    // This ensures they don't lose access to requests that move to other stages
+    if (userId && ['HEAD_OF_DEPARTMENT', 'TRANSPORT_OFFICER', 'ADA_DAHRM', 'PROCUREMENT'].includes(role || '')) {
+      // Add OR condition to include requests where user has an approval
+      const existingOr = where.OR || []
+      where.OR = [
+        ...existingOr,
+        {
+          approvals: {
+            some: {
+              approverId: userId
+            }
+          }
+        }
       ]
     }
 

@@ -191,6 +191,7 @@ model Approval {
 
   @@index([requestId])
   @@index([approverId])
+  @@index([approverId, approved])
   @@unique([requestId, stage])
 }
 
