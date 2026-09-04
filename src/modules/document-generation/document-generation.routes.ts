@@ -7,7 +7,7 @@ const router = express.Router()
 /**
  * @route GET /api/documents/:id/permit
  * @description Generate Fuel Permit document
- * @access Private - Only final approver
+ * @access Private - Only final approver (ADA/DAHRM) or PROCUREMENT
  */
 router.get(
   '/:id/permit',
@@ -18,7 +18,7 @@ router.get(
 /**
  * @route GET /api/documents/:id/statement
  * @description Generate Fuel Statement document
- * @access Private - Only final approver
+ * @access Private - Only final approver (ADA/DAHRM) or PROCUREMENT
  */
 router.get(
   '/:id/statement',

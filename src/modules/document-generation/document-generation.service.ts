@@ -13,7 +13,7 @@ export class DocumentGenerationService {
 
   /**
    * Check if user is authorized to print documents
-   * Only the final approver can print documents
+   * Only the final approver (ADA/DAHRM) or PROCUREMENT role can print documents
    */
   async canPrintDocuments(requestId: string, userId: string): Promise<{ canPrint: boolean; reason?: string }> {
     const request = await prisma.fuelRequest.findUnique({
@@ -33,14 +33,29 @@ export class DocumentGenerationService {
       return { canPrint: false, reason: `Request is not fully approved (current status: ${request.status})` }
     }
 
-    // Final approver must be set
+    // Get user role
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    })
+
+    if (!user) {
+      return { canPrint: false, reason: 'User not found' }
+    }
+
+    // PROCUREMENT role can print all fully approved documents
+    if (user.role === 'PROCUREMENT') {
+      return { canPrint: true }
+    }
+
+    // Final approver must be set for non-PROCUREMENT users
     if (!request.finalApproverId) {
       return { canPrint: false, reason: 'Final approver information is missing' }
     }
 
-    // Only final approver can print
+    // Only final approver (ADA/DAHRM) can print (PROCUREMENT role already approved above)
     if (request.finalApproverId !== userId) {
-      return { canPrint: false, reason: 'Only the user who completed the final approval can print this document' }
+      return { canPrint: false, reason: 'Only the user who completed the final approval (ADA/DAHRM) or PROCUREMENT can print this document' }
     }
 
     return { canPrint: true }
@@ -98,12 +113,18 @@ export class DocumentGenerationService {
       throw new Error('Fuel request not found')
     }
 
+    // Get user info for audit log
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true, firstName: true, lastName: true },
+    })
+
     // Log the print action
     await logAudit({
       userId,
       action: 'FUEL_PERMIT_PRINTED' as any,
       requestId,
-      description: `Fuel Permit for request ${request.requestNumber} was printed by ${userId}`,
+      description: `Fuel Permit for request ${request.requestNumber} was printed by ${user?.firstName} ${user?.lastName} (${user?.role})`,
     })
 
     return {
@@ -204,12 +225,18 @@ export class DocumentGenerationService {
       throw new Error('Fuel request not found')
     }
 
+    // Get user info for audit log
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true, firstName: true, lastName: true },
+    })
+
     // Log the print action
     await logAudit({
       userId,
       action: 'FUEL_STATEMENT_PRINTED' as any,
       requestId,
-      description: `Fuel Statement for request ${request.requestNumber} was printed by ${userId}`,
+      description: `Fuel Statement for request ${request.requestNumber} was printed by ${user?.firstName} ${user?.lastName} (${user?.role})`,
     })
 
     return {

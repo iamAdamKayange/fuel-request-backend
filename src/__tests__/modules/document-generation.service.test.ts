@@ -22,7 +22,7 @@ describe('DocumentGenerationService', () => {
       expect(result.reason).toBe('Fuel request not found')
     })
 
-    it('should return false when user is not final approver', async () => {
+    it('should return false when user is not final approver or PROCUREMENT', async () => {
       // This test would need a real database setup
       // For now, we test the error case
       const result = await service.canPrintDocuments('non-existent-id', 'user-123')
