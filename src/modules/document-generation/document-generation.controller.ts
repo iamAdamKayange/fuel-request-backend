@@ -88,12 +88,42 @@ export class DocumentGenerationController {
       const { id } = req.params
       const requestId = Array.isArray(id) ? id[0] : id
       
-      const result = await documentGenerationService.canPrintDocuments(
+      // Check both permit and statement permissions
+      const canPrintPermit = await documentGenerationService.canPrintDocuments(
         requestId,
         req.user!.id
       )
       
-      return res.json(successResponse(result, 'Print permission checked'))
+      const canPrintStatement = await documentGenerationService.canPrintStatement(
+        requestId,
+        req.user!.id
+      )
+      
+      return res.json(successResponse({
+        canPrintPermit: canPrintPermit.canPrint,
+        canPrintPermitReason: canPrintPermit.reason,
+        canPrintStatement: canPrintStatement.canPrint,
+        canPrintStatementReason: canPrintStatement.reason,
+      }, 'Print permission checked'))
+    } catch (error: any) {
+      return res.status(400).json(errorResponse(error.message))
+    }
+  }
+
+  /**
+   * Check if user can print statement (standalone endpoint)
+   */
+  async checkStatementPermission(req: AuthRequest, res: Response) {
+    try {
+      const { id } = req.params
+      const requestId = Array.isArray(id) ? id[0] : id
+      
+      const result = await documentGenerationService.canPrintStatement(
+        requestId,
+        req.user!.id
+      )
+      
+      return res.json(successResponse(result, 'Statement permission checked'))
     } catch (error: any) {
       return res.status(400).json(errorResponse(error.message))
     }

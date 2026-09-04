@@ -53,9 +53,48 @@ export class DocumentGenerationService {
       return { canPrint: false, reason: 'Final approver information is missing' }
     }
 
-    // Only final approver (ADA/DAHRM) can print (PROCUREMENT role already approved above)
+    // Only final approver (ADA/DAHRM) can print (PROCUREMENT role already handled above)
     if (request.finalApproverId !== userId) {
       return { canPrint: false, reason: 'Only the user who completed the final approval (ADA/DAHRM) or PROCUREMENT can print this document' }
+    }
+
+    return { canPrint: true }
+  }
+
+  /**
+   * Check if user is authorized to print Full Statement
+   * Only TRANSPORT_OFFICER or PROCUREMENT can print Full Statement
+   */
+  async canPrintStatement(requestId: string, userId: string): Promise<{ canPrint: boolean; reason?: string }> {
+    const request = await prisma.fuelRequest.findUnique({
+      where: { id: requestId },
+      select: {
+        status: true,
+      },
+    })
+
+    if (!request) {
+      return { canPrint: false, reason: 'Fuel request not found' }
+    }
+
+    // Can only print if request is fully approved or completed
+    if (request.status !== 'FULLY_APPROVED' && request.status !== 'COMPLETED') {
+      return { canPrint: false, reason: `Request is not fully approved or completed (current status: ${request.status})` }
+    }
+
+    // Get user role
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    })
+
+    if (!user) {
+      return { canPrint: false, reason: 'User not found' }
+    }
+
+    // Only TRANSPORT_OFFICER or PROCUREMENT can print Full Statement
+    if (user.role !== 'TRANSPORT_OFFICER' && user.role !== 'PROCUREMENT') {
+      return { canPrint: false, reason: 'Only TRANSPORT_OFFICER or PROCUREMENT can print the Full Statement' }
     }
 
     return { canPrint: true }
@@ -190,10 +229,10 @@ export class DocumentGenerationService {
    * Generate Fuel Statement document data
    */
   async generateFuelStatementData(requestId: string, userId: string) {
-    // Check authorization
-    const authResult = await this.canPrintDocuments(requestId, userId)
+    // Check authorization for Full Statement (TRANSPORT_OFFICER or PROCUREMENT only)
+    const authResult = await this.canPrintStatement(requestId, userId)
     if (!authResult.canPrint) {
-      const error = new Error(authResult.reason || 'You are not authorized to print this document')
+      const error = new Error(authResult.reason || 'You are not authorized to print the Full Statement')
       error.name = 'AUTHORIZATION_ERROR'
       throw error
     }
