@@ -225,13 +225,6 @@ export class FuelRequestsService {
       ]
     }
 
-    // For approvers (HEAD_OF_DEPARTMENT, TRANSPORT_OFFICER, ADA_DAHRM, PROCUREMENT),
-    // always include requests they have interacted with (have an approval record)
-    // This ensures they don't lose access to requests that move to other stages
-    // NOTE: We'll handle this via a separate query if needed, but for now
-    // rely on the status filters which should include the right statuses
-    // The approval tracking logic can be added in a future optimization
-
     // Helper function to check if user can see rejection details
     const canViewRejectionDetails = (request: any, userId: string, role: string): boolean => {
       if (!request.status.includes('REJECTED')) return false
