@@ -177,8 +177,8 @@ export class FuelRequestsService {
       }
     } else if (role === 'PROCUREMENT') {
       if (!filters?.status) {
-        // PROCUREMENT sees fully approved, pending fuel issuance, and rejected requests they interacted with
-        where.status = { in: ['FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE', 'COMPLETED'] }
+        // PROCUREMENT sees fully approved, pending fuel issuance, completed, and rejected requests they interacted with
+        where.status = { in: ['FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE', 'COMPLETED', 'ADA_REJECTED'] }
       }
     }
 

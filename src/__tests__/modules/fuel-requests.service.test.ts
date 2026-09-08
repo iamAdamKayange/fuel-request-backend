@@ -186,6 +186,7 @@ describe('FuelRequestsService', () => {
       expect(whereClause.status.in).toContain('FULLY_APPROVED')
       expect(whereClause.status.in).toContain('PENDING_FUEL_ISSUANCE')
       expect(whereClause.status.in).toContain('COMPLETED')
+      expect(whereClause.status.in).toContain('ADA_REJECTED')
     })
 
     it('should apply correct status filter for TRANSPORT_OFFICER', async () => {
