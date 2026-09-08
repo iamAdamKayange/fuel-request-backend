@@ -175,11 +175,6 @@ export class FuelRequestsService {
       if (user?.departmentId) {
         where.departmentId = user.departmentId
       }
-      if (!filters?.status) {
-        // By default, show pending and all statuses (including rejected) for department
-        // Rejected requests they interacted with will be included
-        where.status = { in: ['PENDING_HEAD_APPROVAL', 'HEAD_REJECTED', 'PENDING_TRANSPORT_APPROVAL', 'TRANSPORT_REJECTED', 'PENDING_DA_APPROVAL', 'ADA_REJECTED', 'FULLY_APPROVED'] }
-      }
     } else if (role === 'PROCUREMENT') {
       if (!filters?.status) {
         // PROCUREMENT sees fully approved, pending fuel issuance, and rejected requests they interacted with
