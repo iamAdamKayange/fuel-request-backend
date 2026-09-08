@@ -148,9 +148,9 @@ export class UsersService {
     if (data.avatar) {
       // Validate base64 image format
       if (typeof data.avatar === 'string' && data.avatar.startsWith('data:image')) {
-        // Validate size (base64 string length check for ~5MB max)
-        if (data.avatar.length > 5000000) {
-          throw new Error('Avatar image is too large (max 5MB)')
+        // Validate size (base64 string length check for ~2MB max)
+        if (data.avatar.length > 2000000) {
+          throw new Error('Avatar image is too large (max 2MB)')
         }
         updateData.avatar = data.avatar
       } else {
