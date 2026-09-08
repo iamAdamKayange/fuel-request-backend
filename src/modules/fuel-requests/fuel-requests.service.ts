@@ -424,7 +424,21 @@ export class FuelRequestsService {
         select: { departmentId: true },
       })
       if (user?.departmentId !== request.departmentId) {
-        throw new Error('You can only view requests from your department')
+        // Allow if user has interacted with this request (approval record)
+        const hasApproval = request.approvals?.some((a: any) => a.approverId === userId)
+        if (!hasApproval) {
+          throw new Error('You can only view requests from your department')
+        }
+      }
+    }
+
+    // For approvers, allow access if they have interacted with this request
+    // This ensures they can see requests they approved/rejected even after status changes
+    if (userId && ['HEAD_OF_DEPARTMENT', 'TRANSPORT_OFFICER', 'ADA_DAHRM', 'PROCUREMENT'].includes(role || '')) {
+      const hasApproval = request.approvals?.some((a: any) => a.approverId === userId)
+      if (hasApproval) {
+        // User has interacted with this request, allow access
+        return request
       }
     }
 
