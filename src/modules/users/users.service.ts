@@ -137,14 +137,33 @@ export class UsersService {
       }
     }
 
+    const updateData: any = {
+      firstName: data.firstName,
+      lastName: data.lastName,
+      email: data.email,
+      phone: data.phone,
+    }
+
+    // Handle avatar update with validation
+    if (data.avatar) {
+      // Validate base64 image format
+      if (typeof data.avatar === 'string' && data.avatar.startsWith('data:image')) {
+        // Validate size (base64 string length check for ~5MB max)
+        if (data.avatar.length > 5000000) {
+          throw new Error('Avatar image is too large (max 5MB)')
+        }
+        updateData.avatar = data.avatar
+      } else {
+        throw new Error('Invalid avatar format. Must be a base64 image string.')
+      }
+    } else if (data.avatar === null) {
+      // Allow removing avatar
+      updateData.avatar = null
+    }
+
     const user = await prisma.user.update({
       where: { id: userId },
-      data: {
-        firstName: data.firstName,
-        lastName: data.lastName,
-        email: data.email,
-        phone: data.phone,
-      },
+      data: updateData,
       include: {
         department: true,
       },
