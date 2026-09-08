@@ -82,7 +82,7 @@ const envSchema = z.object({
 
   RATE_LIMIT_MAX: z
     .string()
-    .default('100'),
+    .default('500'),
 
   SMTP_HOST: z
     .string()

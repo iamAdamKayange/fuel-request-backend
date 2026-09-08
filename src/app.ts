@@ -6,7 +6,7 @@ import compression from 'compression'
 
 import { env } from './config/env'
 import { errorHandler } from './middleware/errorHandler'
-import { limiter } from './middleware/rateLimit'
+import { limiter, authLimiter } from './middleware/rateLimit'
 import { csrfProtection } from './middleware/csrf'
 import { sessionTimeout } from './middleware/sessionTimeout'
 import { prisma } from './config/database'
@@ -113,7 +113,8 @@ app.use(
   })
 )
 
-// Rate limiting
+// Rate limiting - apply different limiters based on endpoint type
+// General limiter for most endpoints (increased to support concurrent access)
 app.use(limiter)
 
 // Session timeout management (JWT-based, no express-session required)
@@ -200,9 +201,11 @@ app.get('/health/detailed', async (_req, res) => {
   }
 })
 
-// API Routes
-app.use('/api/auth', authRoutes)
+// API Routes with specific rate limiters
+// Auth endpoints - strict rate limiting
+app.use('/api/auth', authLimiter, authRoutes)
 
+// Other API routes - use general limiter
 app.use('/api/users', userRoutes)
 
 app.use('/api/admin', adminRoutes)
