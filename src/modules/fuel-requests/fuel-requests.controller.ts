@@ -33,6 +33,7 @@ export class FuelRequestsController {
         search: req.query.search as string,
         fromDate: req.query.fromDate ? new Date(req.query.fromDate as string) : undefined,
         toDate: req.query.toDate ? new Date(req.query.toDate as string) : undefined,
+        interacted: req.query.interacted === 'true',
       }
 
       const result = await fuelRequestsService.getFuelRequests(

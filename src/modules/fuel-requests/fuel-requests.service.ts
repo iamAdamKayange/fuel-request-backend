@@ -164,72 +164,56 @@ export class FuelRequestsService {
     const skip = (page - 1) * limit
     const where: any = {}
 
-    // Role-based filtering
-    if (role === 'DRIVER' && userId) {
-      where.driverId = userId
-    } else if (role === 'HEAD_OF_DEPARTMENT' && userId) {
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { departmentId: true },
-      })
-      if (user?.departmentId) {
-        where.departmentId = user.departmentId
+    // Interacted filter: show only requests user has interacted with (approval record)
+    if (filters?.interacted && userId && ['HEAD_OF_DEPARTMENT', 'TRANSPORT_OFFICER', 'ADA_DAHRM', 'PROCUREMENT'].includes(role || '')) {
+      where.approvals = {
+        some: {
+          approverId: userId
+        }
       }
-    } else if (role === 'PROCUREMENT') {
-      if (!filters?.status) {
-        // PROCUREMENT sees fully approved, pending fuel issuance, completed, and rejected requests they interacted with
-        where.status = { in: ['FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE', 'COMPLETED', 'ADA_REJECTED'] }
+      // Skip other role-based filtering when interacted filter is active
+      // to show all interacted requests regardless of current status
+      // Still apply object-level authorization below
+    } else {
+      // Role-based filtering
+      if (role === 'DRIVER' && userId) {
+        where.driverId = userId
+      } else if (role === 'HEAD_OF_DEPARTMENT' && userId) {
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { departmentId: true },
+        })
+        if (user?.departmentId) {
+          where.departmentId = user.departmentId
+        }
+      } else if (role === 'PROCUREMENT') {
+        if (!filters?.status) {
+          // PROCUREMENT sees fully approved, pending fuel issuance, completed, and rejected requests
+          where.status = { in: ['FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE', 'COMPLETED', 'ADA_REJECTED'] }
+        }
       }
-    }
 
-    if (filters?.status) {
-      // For approvers, include requests they've interacted with regardless of status
-      if (userId && ['HEAD_OF_DEPARTMENT', 'TRANSPORT_OFFICER', 'ADA_DAHRM', 'PROCUREMENT'].includes(role || '')) {
-        where.OR = [
-          { status: filters.status },  // Match filtered status
-          {
-            status: { not: filters.status },  // OR different status
-            approvals: { some: { approverId: userId } }  // But user interacted
-          }
-        ]
-      } else {
+      if (filters?.status) {
+        // Status filter: return ONLY requests with that exact status
+        // Do NOT include interacted requests with different statuses
+        // Interacted requests are available through the separate "Zilizoshughulikiwa" filter
         where.status = filters.status
+      } else if (role === 'TRANSPORT_OFFICER') {
+        // Transport Officer sees only pending work (their stage)
+        where.status = 'PENDING_TRANSPORT_APPROVAL'
+      } else if (role === 'ADA_DAHRM') {
+        // ADA sees only pending work (their stage)
+        where.status = 'PENDING_DA_APPROVAL'
+      } else if (role === 'HEAD_OF_DEPARTMENT') {
+        // HoD sees only pending work (their stage)
+        where.status = 'PENDING_HEAD_APPROVAL'
+      } else if (role === 'PROCUREMENT') {
+        // PROCUREMENT sees only pending fuel issuance
+        where.status = 'PENDING_FUEL_ISSUANCE'
+      } else if (role === 'DRIVER') {
+        // Driver sees their own requests including rejected ones
+        where.status = { in: ['PENDING_HEAD_APPROVAL', 'HEAD_REJECTED', 'PENDING_TRANSPORT_APPROVAL', 'TRANSPORT_REJECTED', 'PENDING_DA_APPROVAL', 'ADA_REJECTED', 'FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE', 'COMPLETED', 'CANCELLED'] }
       }
-    } else if (role === 'TRANSPORT_OFFICER') {
-      // Transport Officer sees pending (their stage) and requests they interacted with
-      where.OR = [
-        { status: 'PENDING_TRANSPORT_APPROVAL' },
-        {
-          approvals: { some: { approverId: userId } }
-        }
-      ]
-    } else if (role === 'ADA_DAHRM') {
-      // ADA sees pending (their stage) and requests they interacted with
-      where.OR = [
-        { status: 'PENDING_DA_APPROVAL' },
-        {
-          approvals: { some: { approverId: userId } }
-        }
-      ]
-    } else if (role === 'HEAD_OF_DEPARTMENT') {
-      // HoD sees pending (their stage) and requests they interacted with
-      where.OR = [
-        { status: 'PENDING_HEAD_APPROVAL' },
-        {
-          approvals: { some: { approverId: userId } }
-        }
-      ]
-    } else if (role === 'PROCUREMENT') {
-      // PROCUREMENT sees pending fuel issuance and requests they interacted with
-      where.OR = [
-        { status: 'PENDING_FUEL_ISSUANCE' },
-        {
-          approvals: { some: { approverId: userId } }
-        }
-      ]
-    } else if (role === 'DRIVER') {
-      // Driver sees their own requests including rejected ones
-      where.status = { in: ['PENDING_HEAD_APPROVAL', 'HEAD_REJECTED', 'PENDING_TRANSPORT_APPROVAL', 'TRANSPORT_REJECTED', 'PENDING_DA_APPROVAL', 'ADA_REJECTED', 'FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE', 'COMPLETED', 'CANCELLED'] }
     }
 
     if (filters?.departmentId) {
