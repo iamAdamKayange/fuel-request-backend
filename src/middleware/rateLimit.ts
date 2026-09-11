@@ -1,22 +1,16 @@
-import rateLimit from 'express-rate-limit'
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit'
 import { env } from '../config/env'
 
 /**
- * Get client IP address with IPv6 support
- * Handles both IPv4 and IPv6 addresses properly
+ * Get client IP address safely
+ * Handles IPv6-mapped IPv4 addresses (::ffff:x.x.x.x)
  */
 function getClientIp(req: any): string {
-  const ip = req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress
+  const ip = req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || '127.0.0.1'
   
-  // Handle IPv6-mapped IPv4 addresses (::ffff:x.x.x.x)
-  if (ip && ip.includes(':') && ip.includes('.')) {
-    const match = ip.match(/::ffff:(\d+\.\d+\.\d+\.\d+)/)
-    if (match) {
-      return match[1]
-    }
-  }
-  
-  return ip || 'default'
+  // Use official ipKeyGenerator for proper IPv6 handling
+  // This handles IPv4-mapped IPv6 addresses and applies subnet masking
+  return ipKeyGenerator(ip)
 }
 
 // General API limiter - for most endpoints (including read operations)
