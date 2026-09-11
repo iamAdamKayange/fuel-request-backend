@@ -1,4 +1,4 @@
-import rateLimit from 'express-rate-limit'
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit'
 import { env } from '../config/env'
 
 // General API limiter - for most endpoints (including read operations)
@@ -14,7 +14,10 @@ export const limiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: (req) => {
     // Use user ID for authenticated requests, fallback to IP
-    return (req as any).user?.id || req.ip || 'default'
+    if ((req as any).user?.id) {
+      return (req as any).user.id
+    }
+    return ipKeyGenerator(req)
   },
 })
 
@@ -30,7 +33,7 @@ export const strictLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: (req) => {
     // Always use IP for sensitive operations to prevent account enumeration
-    return req.ip || 'default'
+    return ipKeyGenerator(req)
   },
 })
 
@@ -47,7 +50,10 @@ export const readLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: (req) => {
     // Use user ID for authenticated requests, fallback to IP
-    return (req as any).user?.id || req.ip || 'default'
+    if ((req as any).user?.id) {
+      return (req as any).user.id
+    }
+    return ipKeyGenerator(req)
   },
   skip: (req) => {
     // Skip rate limiting for authenticated users if the limit is very high
@@ -68,6 +74,6 @@ export const authLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: (req) => {
     // Always use IP for auth to prevent credential stuffing
-    return req.ip || 'default'
+    return ipKeyGenerator(req)
   },
 })
