@@ -1,6 +1,7 @@
 import { prisma } from '../../config/database'
 import { logAudit } from '../../utils/logger'
 import { notificationService } from '../notifications/notifications.service'
+import { webSocketService } from '../websocket/websocket.service'
 
 export class FuelIssuanceService {
   private static instance: FuelIssuanceService
@@ -100,6 +101,32 @@ export class FuelIssuanceService {
         },
       },
     })
+
+    // Send WebSocket event for real-time updates
+    try {
+      webSocketService.sendNotificationToUser(request.driverId, {
+        type: 'request_updated',
+        requestId,
+        status: 'COMPLETED',
+        notificationType: 'REQUEST_COMPLETED',
+        litresIssued: data.litresIssued,
+        tokenNumber: data.tokenNumber,
+      })
+
+      // Notify final approver if exists
+      if (updatedRequest.finalApproverId) {
+        webSocketService.sendNotificationToUser(updatedRequest.finalApproverId, {
+          type: 'request_updated',
+          requestId,
+          status: 'COMPLETED',
+          notificationType: 'FUEL_ISSUED',
+          litresIssued: data.litresIssued,
+          tokenNumber: data.tokenNumber,
+        })
+      }
+    } catch (error) {
+      console.error('Failed to send WebSocket notification:', error)
+    }
 
     // Log audit
     await logAudit({

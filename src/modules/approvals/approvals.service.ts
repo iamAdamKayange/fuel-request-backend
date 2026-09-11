@@ -1,6 +1,7 @@
 import { prisma } from '../../config/database'
 import { logAudit } from '../../utils/logger'
 import { notificationService } from '../notifications/notifications.service'
+import { webSocketService } from '../websocket/websocket.service'
 import { isEmailConfigured, sendFuelRequestNotification, sendApprovalNotification } from '../../utils/email'
 import { isSMSConfigured, sendFuelRequestSMS, sendApprovalSMS } from '../../utils/sms'
 
@@ -102,6 +103,20 @@ export class ApprovalsService {
         department: true,
       },
     })
+
+    // Send WebSocket event for real-time updates
+    try {
+      const eventType = data.approved ? 'request_approved' : 'request_rejected'
+      webSocketService.sendNotificationToUser(request.driverId, {
+        type: eventType,
+        requestId,
+        status: newStatus,
+        approverId,
+        approverName: `${approver.firstName} ${approver.lastName}`,
+      })
+    } catch (error) {
+      console.error('Failed to send WebSocket notification:', error)
+    }
 
     // Log audit
     await logAudit({
@@ -326,6 +341,39 @@ export class ApprovalsService {
       },
     })
 
+    // Send WebSocket event for real-time updates
+    try {
+      const eventType = data.approved ? 'request_approved' : 'request_rejected'
+      webSocketService.sendNotificationToUser(request.driverId, {
+        type: eventType,
+        requestId,
+        status: newStatus,
+        approverId,
+        approverName: `${approver.firstName} ${approver.lastName}`,
+      })
+
+      // Also notify ADA officers if approved
+      if (data.approved) {
+        const adaOfficers = await prisma.user.findMany({
+          where: {
+            role: 'ADA_DAHRM',
+            isActive: true,
+          },
+        })
+
+        for (const officer of adaOfficers) {
+          webSocketService.sendNotificationToUser(officer.id, {
+            type: 'request_updated',
+            requestId,
+            status: newStatus,
+            notificationType: 'ACTION_REQUIRED',
+          })
+        }
+      }
+    } catch (error) {
+      console.error('Failed to send WebSocket notification:', error)
+    }
+
     // Log audit
     await logAudit({
       userId: approverId,
@@ -549,6 +597,39 @@ export class ApprovalsService {
         department: true,
       },
     })
+
+    // Send WebSocket event for real-time updates
+    try {
+      const eventType = data.approved ? 'request_approved' : 'request_rejected'
+      webSocketService.sendNotificationToUser(request.driverId, {
+        type: eventType,
+        requestId,
+        status: newStatus,
+        approverId,
+        approverName: `${approver.firstName} ${approver.lastName}`,
+      })
+
+      // Also notify procurement officers if approved
+      if (data.approved) {
+        const procurementOfficers = await prisma.user.findMany({
+          where: {
+            role: 'PROCUREMENT',
+            isActive: true,
+          },
+        })
+
+        for (const officer of procurementOfficers) {
+          webSocketService.sendNotificationToUser(officer.id, {
+            type: 'request_updated',
+            requestId,
+            status: newStatus,
+            notificationType: 'ACTION_REQUIRED',
+          })
+        }
+      }
+    } catch (error) {
+      console.error('Failed to send WebSocket notification:', error)
+    }
 
     // Log audit
     await logAudit({

@@ -118,6 +118,15 @@ export class NotificationService {
         requestId: data.requestId,
         createdAt: notification.createdAt,
       })
+
+      // Also send request update event if this is related to a request
+      if (data.requestId) {
+        webSocketService.sendNotificationToUser(data.userId, {
+          type: 'request_updated',
+          requestId: data.requestId,
+          notificationType: data.type,
+        })
+      }
     } catch (error) {
       logger.error('Failed to send WebSocket notification:', error)
     }

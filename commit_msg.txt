@@ -1,0 +1,63 @@
+Add object-level authorization for request access control
+
+SERVER-SIDE AUTHORIZATION FIXES:
+
+1. getFuelRequestById - Approval Tracking for Approvers (fuel-requests.service.ts):
+   - Added approval record check for HEAD_OF_DEPARTMENT, TRANSPORT_OFFICER, ADA_DAHRM, PROCUREMENT
+   - Approvers can now view requests they interacted with even after status changes
+   - Example: HEAD_OF_DEPARTMENT approves request → status changes to PENDING_TRANSPORT_APPROVAL → HEAD still sees the request
+   - Prevents approvers from losing access to requests they approved/rejected
+   - Maintains department scoping for HEAD_OF_DEPARTMENT (with approval override)
+
+2. Authorization Logic Summary:
+   - DRIVER: Can only view their own requests (driverId === userId)
+   - HEAD_OF_DEPARTMENT: Can view department requests OR requests they approved
+   - TRANSPORT_OFFICER: Can view pending/transport requests OR requests they approved
+   - ADA_DAHRM: Can view pending/ADA requests OR requests they approved
+   - PROCUREMENT: Can view approved/issuance requests OR requests they approved
+   - ADMIN: Can view any request (no restrictions)
+   - Status-based access control enforced via allowedStatusByRole
+
+3. Backend getFuelRequests - Already Had Approval Tracking:
+   - OR condition with approvals.some.approverId was already in place
+   - This ensures approvers see requests they interacted with in list views
+   - The fix now extends this to individual request access
+
+TEST COVERAGE (fuel-requests.authorization.test.ts):
+✅ DRIVER can view their own request
+✅ DRIVER denied access to another driver's request
+✅ HEAD_OF_DEPARTMENT can view department request
+✅ HEAD_OF_DEPARTMENT can view request they interacted with (approval record)
+✅ HEAD_OF_DEPARTMENT denied access to different department without interaction
+✅ TRANSPORT_OFFICER can view request they interacted with
+✅ ADA_DAHRM can view request they interacted with
+✅ PROCUREMENT can view request they interacted with
+✅ Status-based access control enforced
+✅ ADMIN can view any request
+✅ Role-based filtering in WHERE clause
+✅ Approval-based OR condition for approvers
+
+SECURITY VERIFICATION:
+✅ Direct API access cannot bypass frontend restrictions
+✅ Server-side authorization enforced in getFuelRequestById
+✅ Server-side authorization enforced in getFuelRequests
+✅ Object-level authorization prevents unauthorized access by ID
+✅ Account switching cannot leak previous user's access
+✅ No frontend-only security bypass possible
+
+PRESERVED:
+✅ All business rules
+✅ Approval workflow
+✅ RBAC (role-based access control)
+✅ Printing permissions
+✅ Department scoping for HEAD_OF_DEPARTMENT
+✅ Status-based workflow stages
+✅ Rejection tracking and visibility
+
+WORKFLOW ACCESS CONFIRMED:
+- Request aliyo-create user → owner anaiona (DRIVER sees own requests)
+- Request aliyoi-review/approve/reject role → inaonekana kwenye history/activity (approval tracking)
+- User mwingine asiyehusika → asiweze ku-access record (authorization checks)
+- Pending, approved, rejected na history zifuate role permissions (allowedStatusByRole)
+- Direct API access isiweze bypass (server-side authorization)
+- Account switching isiache access/cache (refreshPromise cleared, userId dependency)

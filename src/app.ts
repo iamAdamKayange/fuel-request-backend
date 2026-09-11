@@ -114,8 +114,15 @@ app.use(
 )
 
 // Rate limiting - apply different limiters based on endpoint type
-// General limiter for most endpoints (increased to support concurrent access)
-app.use(limiter)
+// Apply general limiter to most endpoints but skip auth endpoints (they have their own)
+app.use((req, res, next) => {
+  // Skip rate limiting for auth endpoints (they have their own strict limiter)
+  if (req.path.startsWith('/api/auth')) {
+    next()
+  } else {
+    limiter(req, res, next)
+  }
+})
 
 // Session timeout management (JWT-based, no express-session required)
 app.use(sessionTimeout)
