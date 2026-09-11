@@ -677,9 +677,11 @@ export class FuelRequestsService {
   async getRoleStats(userId: string, role: string) {
     const where: any = {}
 
-    // Role-based base filtering
+    // Role-based base filtering - MUST match getFuelRequests logic exactly
     if (role === 'DRIVER') {
       where.driverId = userId
+      // Driver sees all their own requests (same as getFuelRequests no-filter)
+      where.status = { in: ['PENDING_HEAD_APPROVAL', 'HEAD_REJECTED', 'PENDING_TRANSPORT_APPROVAL', 'TRANSPORT_REJECTED', 'PENDING_DA_APPROVAL', 'ADA_REJECTED', 'FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE', 'COMPLETED', 'CANCELLED'] }
     } else if (role === 'HEAD_OF_DEPARTMENT') {
       const user = await prisma.user.findUnique({
         where: { id: userId },
@@ -688,24 +690,17 @@ export class FuelRequestsService {
       if (user?.departmentId) {
         where.departmentId = user.departmentId
       }
+      // HoD sees only pending work (their stage) - same as getFuelRequests no-filter
+      where.status = 'PENDING_HEAD_APPROVAL'
+    } else if (role === 'TRANSPORT_OFFICER') {
+      // Transport Officer sees only pending work (their stage) - same as getFuelRequests no-filter
+      where.status = 'PENDING_TRANSPORT_APPROVAL'
+    } else if (role === 'ADA_DAHRM') {
+      // ADA sees only pending work (their stage) - same as getFuelRequests no-filter
+      where.status = 'PENDING_DA_APPROVAL'
     } else if (role === 'PROCUREMENT') {
-      // PROCUREMENT sees all fully approved and pending fuel issuance requests
-      where.status = { in: ['FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE', 'COMPLETED', 'ADA_REJECTED'] }
-    }
-
-    // For approvers, include requests they have interacted with
-    if (['HEAD_OF_DEPARTMENT', 'TRANSPORT_OFFICER', 'ADA_DAHRM', 'PROCUREMENT'].includes(role)) {
-      const existingOr = where.OR || []
-      where.OR = [
-        ...existingOr,
-        {
-          approvals: {
-            some: {
-              approverId: userId
-            }
-          }
-        }
-      ]
+      // PROCUREMENT sees only pending fuel issuance - same as getFuelRequests no-filter
+      where.status = 'PENDING_FUEL_ISSUANCE'
     }
 
     // Get the pending status for this role
@@ -717,8 +712,10 @@ export class FuelRequestsService {
     // Get completed statuses this role can see
     const completedStatuses = this.getCompletedStatusesForRole(role)
 
-    // Count by status
-    const [total, pending, rejected, completed, litres] = await Promise.all([
+    // Count by status - ALL counts must match getFuelRequests logic exactly
+    // Do NOT include OR condition for interacted requests in stats
+    // Interacted requests are accessed through the separate "interacted=true" filter
+    const [total, pending, rejected, completed, litres, interacted] = await Promise.all([
       prisma.fuelRequest.count({ where }),
       prisma.fuelRequest.count({
         where: {
@@ -741,7 +738,19 @@ export class FuelRequestsService {
       prisma.fuelRequest.aggregate({
         where,
         _sum: { issuedLitres: true, approvedLitres: true, requestedLitres: true }
-      })
+      }),
+      // Interacted count for approver roles - matches interacted=true filter
+      ['HEAD_OF_DEPARTMENT', 'TRANSPORT_OFFICER', 'ADA_DAHRM', 'PROCUREMENT'].includes(role)
+        ? prisma.fuelRequest.count({
+            where: {
+              approvals: {
+                some: {
+                  approverId: userId
+                }
+              }
+            }
+          })
+        : Promise.resolve(0)
     ])
 
     return {
@@ -749,7 +758,8 @@ export class FuelRequestsService {
       pending,
       rejected,
       completed,
-      totalLitres: litres._sum.issuedLitres || litres._sum.approvedLitres || litres._sum.requestedLitres || 0
+      totalLitres: litres._sum.issuedLitres || litres._sum.approvedLitres || litres._sum.requestedLitres || 0,
+      interacted
     }
   }
 
