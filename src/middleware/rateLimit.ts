@@ -1,5 +1,23 @@
-import rateLimit, { ipKeyGenerator } from 'express-rate-limit'
+import rateLimit from 'express-rate-limit'
 import { env } from '../config/env'
+
+/**
+ * Get client IP address with IPv6 support
+ * Handles both IPv4 and IPv6 addresses properly
+ */
+function getClientIp(req: any): string {
+  const ip = req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress
+  
+  // Handle IPv6-mapped IPv4 addresses (::ffff:x.x.x.x)
+  if (ip && ip.includes(':') && ip.includes('.')) {
+    const match = ip.match(/::ffff:(\d+\.\d+\.\d+\.\d+)/)
+    if (match) {
+      return match[1]
+    }
+  }
+  
+  return ip || 'default'
+}
 
 // General API limiter - for most endpoints (including read operations)
 // Increased to support legitimate concurrent access
@@ -17,7 +35,7 @@ export const limiter = rateLimit({
     if ((req as any).user?.id) {
       return (req as any).user.id
     }
-    return ipKeyGenerator(req)
+    return getClientIp(req)
   },
 })
 
@@ -33,7 +51,7 @@ export const strictLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: (req) => {
     // Always use IP for sensitive operations to prevent account enumeration
-    return ipKeyGenerator(req)
+    return getClientIp(req)
   },
 })
 
@@ -53,7 +71,7 @@ export const readLimiter = rateLimit({
     if ((req as any).user?.id) {
       return (req as any).user.id
     }
-    return ipKeyGenerator(req)
+    return getClientIp(req)
   },
   skip: (req) => {
     // Skip rate limiting for authenticated users if the limit is very high
@@ -74,6 +92,6 @@ export const authLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: (req) => {
     // Always use IP for auth to prevent credential stuffing
-    return ipKeyGenerator(req)
+    return getClientIp(req)
   },
 })

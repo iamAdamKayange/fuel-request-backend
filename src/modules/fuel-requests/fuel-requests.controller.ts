@@ -96,6 +96,18 @@ export class FuelRequestsController {
       res.status(400).json(errorResponse(error.message))
     }
   }
+
+  async getRoleStats(req: AuthRequest, res: Response) {
+    try {
+      const stats = await fuelRequestsService.getRoleStats(
+        req.user!.id,
+        req.user!.role
+      )
+      res.json(successResponse(stats, 'Role statistics retrieved'))
+    } catch (error: any) {
+      res.status(400).json(errorResponse(error.message))
+    }
+  }
 }
 
 export const fuelRequestsController = FuelRequestsController.getInstance()

@@ -76,4 +76,15 @@ router.post(
   fuelRequestsController.cancelFuelRequest
 )
 
+/**
+ * @route GET /api/fuel-requests/stats
+ * @description Get role-specific statistics for authenticated user
+ * @access Private - All authenticated users
+ */
+router.get(
+  '/stats',
+  requireAuth,
+  fuelRequestsController.getRoleStats
+)
+
 export default router
