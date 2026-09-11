@@ -39,6 +39,17 @@ router.get(
 )
 
 /**
+ * @route GET /api/fuel-requests/stats
+ * @description Get role-specific statistics for authenticated user
+ * @access Private - All authenticated users
+ */
+router.get(
+  '/stats',
+  requireAuth,
+  fuelRequestsController.getRoleStats
+)
+
+/**
  * @route GET /api/fuel-requests/:id
  * @description Get fuel request by ID
  * @access Private - All authenticated users (filtered by role)
@@ -74,17 +85,6 @@ router.post(
   requireRole('DRIVER'),
   validate(cancelFuelRequestSchema),
   fuelRequestsController.cancelFuelRequest
-)
-
-/**
- * @route GET /api/fuel-requests/stats
- * @description Get role-specific statistics for authenticated user
- * @access Private - All authenticated users
- */
-router.get(
-  '/stats',
-  requireAuth,
-  fuelRequestsController.getRoleStats
 )
 
 export default router
