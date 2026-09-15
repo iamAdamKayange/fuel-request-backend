@@ -186,33 +186,34 @@ export class FuelRequestsService {
         if (user?.departmentId) {
           where.departmentId = user.departmentId
         }
-      } else if (role === 'PROCUREMENT') {
-        if (!filters?.status) {
-          // PROCUREMENT sees fully approved, pending fuel issuance, completed, and rejected requests
-          where.status = { in: ['FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE', 'COMPLETED', 'ADA_REJECTED'] }
-        }
       }
 
-      if (filters?.status) {
+      // Status filtering - apply only if no explicit status filter provided
+      if (!filters?.status) {
+        if (role === 'ADMIN') {
+          // ADMIN sees all requests - no status filter
+          // Keep where clause as is (no status restriction)
+        } else if (role === 'PROCUREMENT') {
+          // PROCUREMENT sees fully approved, pending fuel issuance, completed, and rejected requests
+          where.status = { in: ['FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE', 'COMPLETED', 'ADA_REJECTED'] }
+        } else if (role === 'TRANSPORT_OFFICER') {
+          // Transport Officer sees only pending work (their stage)
+          where.status = 'PENDING_TRANSPORT_APPROVAL'
+        } else if (role === 'ADA_DAHRM') {
+          // ADA sees only pending work (their stage)
+          where.status = 'PENDING_DA_APPROVAL'
+        } else if (role === 'HEAD_OF_DEPARTMENT') {
+          // HoD sees only pending work (their stage)
+          where.status = 'PENDING_HEAD_APPROVAL'
+        } else if (role === 'DRIVER') {
+          // Driver sees their own requests including rejected ones
+          where.status = { in: ['PENDING_HEAD_APPROVAL', 'HEAD_REJECTED', 'PENDING_TRANSPORT_APPROVAL', 'TRANSPORT_REJECTED', 'PENDING_DA_APPROVAL', 'ADA_REJECTED', 'FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE', 'COMPLETED', 'CANCELLED'] }
+        }
+      } else {
         // Status filter: return ONLY requests with that exact status
         // Do NOT include interacted requests with different statuses
         // Interacted requests are available through the separate "Zilizoshughulikiwa" filter
         where.status = filters.status
-      } else if (role === 'TRANSPORT_OFFICER') {
-        // Transport Officer sees only pending work (their stage)
-        where.status = 'PENDING_TRANSPORT_APPROVAL'
-      } else if (role === 'ADA_DAHRM') {
-        // ADA sees only pending work (their stage)
-        where.status = 'PENDING_DA_APPROVAL'
-      } else if (role === 'HEAD_OF_DEPARTMENT') {
-        // HoD sees only pending work (their stage)
-        where.status = 'PENDING_HEAD_APPROVAL'
-      } else if (role === 'PROCUREMENT') {
-        // PROCUREMENT sees only pending fuel issuance
-        where.status = 'PENDING_FUEL_ISSUANCE'
-      } else if (role === 'DRIVER') {
-        // Driver sees their own requests including rejected ones
-        where.status = { in: ['PENDING_HEAD_APPROVAL', 'HEAD_REJECTED', 'PENDING_TRANSPORT_APPROVAL', 'TRANSPORT_REJECTED', 'PENDING_DA_APPROVAL', 'ADA_REJECTED', 'FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE', 'COMPLETED', 'CANCELLED'] }
       }
     }
 
@@ -678,7 +679,10 @@ export class FuelRequestsService {
     const where: any = {}
 
     // Role-based base filtering - MUST match getFuelRequests logic exactly
-    if (role === 'DRIVER') {
+    if (role === 'ADMIN') {
+      // ADMIN sees all requests - no base filtering
+      // Keep where clause empty (no restrictions)
+    } else if (role === 'DRIVER') {
       where.driverId = userId
       // Driver sees all their own requests (same as getFuelRequests no-filter)
       where.status = { in: ['PENDING_HEAD_APPROVAL', 'HEAD_REJECTED', 'PENDING_TRANSPORT_APPROVAL', 'TRANSPORT_REJECTED', 'PENDING_DA_APPROVAL', 'ADA_REJECTED', 'FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE', 'COMPLETED', 'CANCELLED'] }
@@ -699,8 +703,9 @@ export class FuelRequestsService {
       // ADA sees only pending work (their stage) - same as getFuelRequests no-filter
       where.status = 'PENDING_DA_APPROVAL'
     } else if (role === 'PROCUREMENT') {
-      // PROCUREMENT sees only pending fuel issuance - same as getFuelRequests no-filter
-      where.status = 'PENDING_FUEL_ISSUANCE'
+      // PROCUREMENT sees fully approved, pending fuel issuance, completed, and rejected requests
+      // This matches getFuelRequests no-filter logic (lines 189-193)
+      where.status = { in: ['FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE', 'COMPLETED', 'ADA_REJECTED'] }
     }
 
     // Get the pending status for this role
