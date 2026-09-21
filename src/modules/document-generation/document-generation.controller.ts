@@ -48,6 +48,48 @@ export class DocumentGenerationController {
     }
   }
 
+  async generateFuelPermitPDF(req: AuthRequest, res: Response) {
+    try {
+      const { id } = req.params
+      const requestId = Array.isArray(id) ? id[0] : id
+      
+      const pdfBuffer = await documentGenerationService.generateFuelPermitPDF(
+        requestId,
+        req.user!.id
+      )
+      
+      res.setHeader('Content-Type', 'application/pdf')
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename=fuel-permit-${req.params.id}-${Date.now()}.pdf`
+      )
+      res.send(pdfBuffer)
+    } catch (error: any) {
+      // Handle different error types with appropriate status codes
+      if (error.name === 'AUTHORIZATION_ERROR') {
+        res.status(403).json({
+          success: false,
+          message: error.message,
+          code: 'PRINT_PERMISSION_DENIED'
+        })
+        return
+      }
+      if (error.message?.includes('not found')) {
+        res.status(404).json({
+          success: false,
+          message: error.message,
+          code: 'DOCUMENT_NOT_FOUND'
+        })
+        return
+      }
+      res.status(400).json({
+        success: false,
+        message: error.message,
+        code: 'PDF_GENERATION_ERROR'
+      })
+    }
+  }
+
   async generateFuelStatement(req: AuthRequest, res: Response) {
     try {
       const { id } = req.params

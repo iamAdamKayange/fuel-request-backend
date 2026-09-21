@@ -16,6 +16,17 @@ router.get(
 )
 
 /**
+ * @route GET /api/documents/:id/permit/pdf
+ * @description Generate Fuel Permit PDF document
+ * @access Private - Only final approver (ADA/DAHRM) or PROCUREMENT
+ */
+router.get(
+  '/:id/permit/pdf',
+  requireAuth,
+  documentGenerationController.generateFuelPermitPDF
+)
+
+/**
  * @route GET /api/documents/:id/statement
  * @description Generate Fuel Statement document
  * @access Private - Only TRANSPORT_OFFICER or PROCUREMENT
