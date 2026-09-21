@@ -1,6 +1,8 @@
 import { prisma } from '../../config/database'
 import { logAudit } from '../../utils/logger'
 import PDFDocument from 'pdfkit'
+import path from 'path'
+import fs from 'fs'
 
 export class DocumentGenerationService {
   private static instance: DocumentGenerationService
@@ -180,8 +182,15 @@ export class DocumentGenerationService {
       const rightMargin = 550
 
       // ============================================================
-      // HEADER SECTION
+      // HEADER SECTION WITH EMBLEM
       // ============================================================
+      
+      // Add emblem logo
+      const emblemPath = path.join(process.cwd(), 'public/assets/tanzania-emblem.png')
+      if (fs.existsSync(emblemPath)) {
+        doc.image(emblemPath, 245, 40, { width: 50, height: 50 })
+      }
+      
       doc.fontSize(11).font('Helvetica-Bold').text('JAMHURI YA MUUNGANO WA TANZANIA', { align: 'center' })
       doc.moveDown(0.2)
       doc.fontSize(10).font('Helvetica-Bold').text('WIZARA YA HABARI, UTAMADUNI, SANAA NA MICHEZO', { align: 'center' })
