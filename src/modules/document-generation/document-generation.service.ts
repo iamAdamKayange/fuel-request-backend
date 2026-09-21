@@ -255,8 +255,9 @@ export class DocumentGenerationService {
       
       // GPSA
       doc.text('GPSA:', leftMargin, sectionAY + 80)
-      doc.text(request.vehicle.gpsa || 'N/A', leftMargin + 140, sectionAY + 80)
-      doc.moveTo(leftMargin + 140 + doc.widthOfString(request.vehicle.gpsa || 'N/A'), sectionAY + 88).lineTo(rightMargin, sectionAY + 88).stroke()
+      const gpsaValue = request.gpsa || ''
+      doc.text(gpsaValue, leftMargin + 140, sectionAY + 80)
+      doc.moveTo(leftMargin + 140 + doc.widthOfString(gpsaValue), sectionAY + 88).lineTo(rightMargin, sectionAY + 88).stroke()
       
       // Kwa ajili ya
       doc.text('Kwa ajili ya:', leftMargin, sectionAY + 100)
