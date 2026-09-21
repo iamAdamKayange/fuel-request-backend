@@ -148,7 +148,16 @@ export class DocumentGenerationService {
           },
           orderBy: { approvedAt: 'asc' },
         },
-        fuelIssuance: true,
+        fuelIssuance: {
+          include: {
+            issuer: {
+              select: {
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
       },
     })
 
@@ -346,9 +355,10 @@ export class DocumentGenerationService {
       
       // Apewe/asipewe Lita
       doc.text('Apewe/asipewe Lita:', leftMargin, sectionCY)
-      const transportLitres = transportApproval?.litresApproved || request.approvedLitres || request.requestedLitres
-      doc.text(`${transportLitres}`, leftMargin + 140, sectionCY)
-      doc.moveTo(leftMargin + 140 + doc.widthOfString(`${transportLitres}`), sectionCY + 8).lineTo(rightMargin, sectionCY + 8).stroke()
+      const transportLitres = transportApproval?.litresApproved
+      const transportLitresText = transportLitres !== undefined && transportLitres !== null ? `${transportLitres}` : ''
+      doc.text(transportLitresText, leftMargin + 140, sectionCY)
+      doc.moveTo(leftMargin + 140 + doc.widthOfString(transportLitresText), sectionCY + 8).lineTo(rightMargin, sectionCY + 8).stroke()
       
       // kwa sababu
       doc.text('kwa sababu:', leftMargin, sectionCY + 20)
@@ -400,7 +410,9 @@ export class DocumentGenerationService {
       
       // Naridhia/Siridhii
       doc.text('Naridhia/Siridhii:', leftMargin, sectionDY)
-      const adaDecision = adaApproval?.approved ? 'Naridhia' : 'Siridhii'
+      const adaDecision = adaApproval?.approved !== undefined && adaApproval?.approved !== null 
+        ? (adaApproval.approved ? 'Naridhia' : 'Siridhii') 
+        : ''
       doc.text(adaDecision, leftMargin + 140, sectionDY)
       doc.moveTo(leftMargin + 140 + doc.widthOfString(adaDecision), sectionDY + 8).lineTo(rightMargin, sectionDY + 8).stroke()
       
@@ -412,15 +424,13 @@ export class DocumentGenerationService {
       
       // Jina
       doc.text('Jina:', leftMargin, sectionDY + 52)
-      const adaName = adaApproval ? `${adaApproval.approver.firstName} ${adaApproval.approver.lastName}` : 
-                      (request.finalApprover ? `${request.finalApprover.firstName} ${request.finalApprover.lastName}` : '')
+      const adaName = adaApproval ? `${adaApproval.approver.firstName} ${adaApproval.approver.lastName}` : ''
       doc.text(adaName, leftMargin + 140, sectionDY + 52)
       doc.moveTo(leftMargin + 140 + doc.widthOfString(adaName), sectionDY + 60).lineTo(rightMargin, sectionDY + 60).stroke()
       
       // Cheo
       doc.text('Cheo:', leftMargin, sectionDY + 72)
-      const adaTitle = adaApproval?.approver.title || adaApproval?.designation || 
-                      (request.finalApprover?.title || 'ADA')
+      const adaTitle = adaApproval?.approver.title || adaApproval?.designation || ''
       doc.text(adaTitle, leftMargin + 140, sectionDY + 72)
       doc.moveTo(leftMargin + 140 + doc.widthOfString(adaTitle), sectionDY + 80).lineTo(rightMargin, sectionDY + 80).stroke()
       
@@ -430,8 +440,7 @@ export class DocumentGenerationService {
       
       // Tarehe
       doc.text('Tarehe:', leftMargin, sectionDY + 112)
-      const adaDate = adaApproval?.approvedAt ? new Date(adaApproval.approvedAt).toLocaleDateString('sw-TZ') : 
-                     (request.finalApprovedAt ? new Date(request.finalApprovedAt).toLocaleDateString('sw-TZ') : '')
+      const adaDate = adaApproval?.approvedAt ? new Date(adaApproval.approvedAt).toLocaleDateString('sw-TZ') : ''
       doc.text(adaDate, leftMargin + 140, sectionDY + 112)
       doc.moveTo(leftMargin + 140 + doc.widthOfString(adaDate), sectionDY + 120).lineTo(leftMargin + 250, sectionDY + 120).stroke()
       
@@ -454,13 +463,16 @@ export class DocumentGenerationService {
       
       // Lita zilizotolewa
       doc.text('Lita zilizotolewa:', leftMargin, sectionEY + 20)
-      const issuedLitres = request.fuelIssuance?.litresIssued || request.issuedLitres || ''
-      doc.text(`${issuedLitres}`, leftMargin + 140, sectionEY + 20)
-      doc.moveTo(leftMargin + 140 + doc.widthOfString(`${issuedLitres}`), sectionEY + 28).lineTo(rightMargin, sectionEY + 28).stroke()
+      const issuedLitres = request.fuelIssuance?.litresIssued
+      const issuedLitresText = issuedLitres !== undefined && issuedLitres !== null ? `${issuedLitres}` : ''
+      doc.text(issuedLitresText, leftMargin + 140, sectionEY + 20)
+      doc.moveTo(leftMargin + 140 + doc.widthOfString(issuedLitresText), sectionEY + 28).lineTo(rightMargin, sectionEY + 28).stroke()
       
       // Jina la Mtoaji
       doc.text('Jina la Mtoaji:', leftMargin, sectionEY + 40)
-      const issuerName = request.fuelIssuance ? 'Issued' : ''
+      const issuerName = request.fuelIssuance?.issuer?.firstName && request.fuelIssuance.issuer?.lastName 
+        ? `${request.fuelIssuance.issuer.firstName} ${request.fuelIssuance.issuer.lastName}` 
+        : ''
       doc.text(issuerName, leftMargin + 140, sectionEY + 40)
       doc.moveTo(leftMargin + 140 + doc.widthOfString(issuerName), sectionEY + 48).lineTo(rightMargin, sectionEY + 48).stroke()
       
@@ -648,7 +660,16 @@ export class DocumentGenerationService {
             lastName: true,
           },
         },
-        fuelIssuance: true,
+        fuelIssuance: {
+          include: {
+            issuer: {
+              select: {
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
       },
     })
 
