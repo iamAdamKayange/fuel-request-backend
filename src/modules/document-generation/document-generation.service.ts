@@ -102,7 +102,7 @@ export class DocumentGenerationService {
   }
 
   /**
-   * Generate official PDF format Fuel Permit
+   * Generate official PDF format Fuel Permit matching reference form
    */
   async generateFuelPermitPDF(requestId: string, userId: string): Promise<Buffer> {
     // Check authorization
@@ -146,6 +146,7 @@ export class DocumentGenerationService {
           },
           orderBy: { approvedAt: 'asc' },
         },
+        fuelIssuance: true,
       },
     })
 
@@ -168,196 +169,313 @@ export class DocumentGenerationService {
     })
 
     return new Promise((resolve, reject) => {
-      const doc = new PDFDocument({ size: 'A4', margin: 50 })
+      const doc = new PDFDocument({ size: 'A4', margin: 40 })
       const chunks: Buffer[] = []
 
       doc.on('data', (chunk: Buffer) => chunks.push(chunk))
       doc.on('end', () => resolve(Buffer.concat(chunks)))
       doc.on('error', reject)
 
-      // Header Section
-      doc.fontSize(14).font('Helvetica-Bold').text('JAMHURI YA MUUNGANO WA TANZANIA', { align: 'center' })
+      const leftMargin = 40
+      const rightMargin = 550
+
+      // ============================================================
+      // HEADER SECTION
+      // ============================================================
+      doc.fontSize(11).font('Helvetica-Bold').text('JAMHURI YA MUUNGANO WA TANZANIA', { align: 'center' })
+      doc.moveDown(0.2)
+      doc.fontSize(10).font('Helvetica-Bold').text('WIZARA YA HABARI, UTAMADUNI, SANAA NA MICHEZO', { align: 'center' })
       doc.moveDown(0.3)
-      doc.fontSize(12).font('Helvetica').text('WIZARA YA HABARI, UTAMADUNI, SANAA NA MICHEZO', { align: 'center' })
+      
+      // Ministry Contact Info
+      doc.fontSize(8).font('Helvetica')
+      doc.text('Simu: +255 (026) - 2322129  |  Nukushi: +255 (026) - 2322126', { align: 'center' })
+      doc.text('Barua pepe: km@michezo.go.tz  |  Tovuti: www.michezo.go.tz', { align: 'center' })
+      doc.text('Mji wa Serikali - Mtumba, 2 Mtaa wa Michezo, S.L.P 25, 40481 DODOMA', { align: 'center' })
       doc.moveDown(0.5)
       
       // Main Title
-      doc.fontSize(18).font('Helvetica-Bold').text('KIBALI CHA KUCHUKUA MAFUTA', { align: 'center' })
-      doc.moveDown(1)
-      
-      // Separator line
-      doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke()
-      doc.moveDown(1)
-
-      // Request Information Section
-      doc.fontSize(12).font('Helvetica-Bold').text('TAARIFA YA OMBI', { underline: true })
+      doc.fontSize(16).font('Helvetica-Bold').text('KIBALI CHA KUCHUKUA MAFUTA', { align: 'center' })
       doc.moveDown(0.5)
       
-      const leftMargin = 50
-      const labelWidth = 120
-      const startY = doc.y
+      // Double line separator
+      doc.moveTo(leftMargin, doc.y).lineTo(rightMargin, doc.y).stroke()
+      doc.moveDown(0.2)
+      doc.moveTo(leftMargin, doc.y).lineTo(rightMargin, doc.y).stroke()
+      doc.moveDown(0.8)
 
-      doc.fontSize(10).font('Helvetica')
-      doc.text('Namba ya Ombi:', leftMargin, startY)
-      doc.text(`: ${request.requestNumber}`, leftMargin + labelWidth, startY)
+      // ============================================================
+      // SECTION A: SEHEMU YA MWOMBAJI/DEREVA
+      // ============================================================
+      doc.fontSize(11).font('Helvetica-Bold').text('A. SEHEMU YA MWOMBAJI/DEREVA', { underline: true })
+      doc.moveDown(0.4)
       
-      doc.text('Tarehe:', leftMargin, startY + 20)
-      const issueDate = request.finalApprovedAt || new Date()
-      doc.text(`: ${issueDate.toLocaleDateString('sw-TZ')}`, leftMargin + labelWidth, startY + 20)
+      doc.fontSize(9).font('Helvetica')
+      const sectionAY = doc.y
+      
+      // Jina la Mwombaji/Dereva
+      doc.text('Jina la Mwombaji/Dereva:', leftMargin, sectionAY)
+      const driverName = `${request.driver.firstName} ${request.driver.lastName}`
+      doc.text(driverName, leftMargin + 140, sectionAY)
+      doc.moveTo(leftMargin + 140 + doc.widthOfString(driverName), sectionAY + 8).lineTo(rightMargin, sectionAY + 8).stroke()
+      
+      // Idara
+      doc.text('Idara:', leftMargin, sectionAY + 20)
+      doc.text(request.department.name, leftMargin + 140, sectionAY + 20)
+      doc.moveTo(leftMargin + 140 + doc.widthOfString(request.department.name), sectionAY + 28).lineTo(rightMargin, sectionAY + 28).stroke()
+      
+      // Ninaomba kuidhinishiwa mafuta Diesel/Petrol Lita
+      doc.text('Ninaomba kuidhinishiwa mafuta Diesel/Petrol Lita:', leftMargin, sectionAY + 40)
+      const fuelInfo = `${request.fuelType} - ${request.requestedLitres}`
+      doc.text(fuelInfo, leftMargin + 180, sectionAY + 40)
+      doc.moveTo(leftMargin + 180 + doc.widthOfString(fuelInfo), sectionAY + 48).lineTo(rightMargin, sectionAY + 48).stroke()
+      
+      // Kwa gari namba
+      doc.text('Kwa gari namba:', leftMargin, sectionAY + 60)
+      doc.text(request.vehicle.vehicleNumber, leftMargin + 140, sectionAY + 60)
+      doc.moveTo(leftMargin + 140 + doc.widthOfString(request.vehicle.vehicleNumber), sectionAY + 68).lineTo(rightMargin, sectionAY + 68).stroke()
+      
+      // GPSA
+      doc.text('GPSA:', leftMargin, sectionAY + 80)
+      doc.text(request.vehicle.gpsa || 'N/A', leftMargin + 140, sectionAY + 80)
+      doc.moveTo(leftMargin + 140 + doc.widthOfString(request.vehicle.gpsa || 'N/A'), sectionAY + 88).lineTo(rightMargin, sectionAY + 88).stroke()
+      
+      // Kwa ajili ya
+      doc.text('Kwa ajili ya:', leftMargin, sectionAY + 100)
+      doc.text(request.purpose, leftMargin + 140, sectionAY + 100)
+      doc.moveTo(leftMargin + 140 + doc.widthOfString(request.purpose), sectionAY + 108).lineTo(rightMargin, sectionAY + 108).stroke()
+      
+      // za kuanzia Km
+      doc.text('za kuanzia:', leftMargin, sectionAY + 120)
+      doc.text(`${request.kmFrom} Km`, leftMargin + 140, sectionAY + 120)
+      doc.moveTo(leftMargin + 140 + doc.widthOfString(`${request.kmFrom} Km`), sectionAY + 128).lineTo(rightMargin, sectionAY + 128).stroke()
+      
+      // Km za sasa
+      doc.text('Km za sasa:', leftMargin, sectionAY + 140)
+      doc.text(`${request.kmTo} Km`, leftMargin + 140, sectionAY + 140)
+      doc.moveTo(leftMargin + 140 + doc.widthOfString(`${request.kmTo} Km`), sectionAY + 148).lineTo(rightMargin, sectionAY + 148).stroke()
+      
+      // zilizotumika
+      doc.text('zilizotumika:', leftMargin, sectionAY + 160)
+      doc.text(`${request.kmUsed}`, leftMargin + 140, sectionAY + 160)
+      doc.moveTo(leftMargin + 140 + doc.widthOfString(`${request.kmUsed}`), sectionAY + 168).lineTo(rightMargin, sectionAY + 168).stroke()
+      
+      // Mara ya mwisho nilipewa lita
+      doc.text('Mara ya mwisho nilipewa lita:', leftMargin, sectionAY + 180)
+      doc.text(`${request.lastFuelReceived}`, leftMargin + 140, sectionAY + 180)
+      doc.moveTo(leftMargin + 140 + doc.widthOfString(`${request.lastFuelReceived}`), sectionAY + 188).lineTo(rightMargin, sectionAY + 188).stroke()
+      
+      // tarehe
+      doc.text('tarehe:', leftMargin, sectionAY + 200)
+      const lastFuelDate = request.requestDate.toLocaleDateString('sw-TZ')
+      doc.text(lastFuelDate, leftMargin + 140, sectionAY + 200)
+      doc.moveTo(leftMargin + 140 + doc.widthOfString(lastFuelDate), sectionAY + 208).lineTo(rightMargin, sectionAY + 208).stroke()
+      
+      // Saini ya Mwombaji
+      doc.text('Saini ya Mwombaji:', leftMargin, sectionAY + 220)
+      doc.moveTo(leftMargin + 140, sectionAY + 228).lineTo(leftMargin + 300, sectionAY + 228).stroke()
+      
+      // Tarehe (signature date)
+      doc.text('Tarehe:', leftMargin, sectionAY + 240)
+      doc.moveTo(leftMargin + 140, sectionAY + 248).lineTo(leftMargin + 250, sectionAY + 248).stroke()
       
       doc.moveDown(1)
 
-      // Driver Information Section
-      doc.fontSize(12).font('Helvetica-Bold').text('MAELEZO YA MWOMBAJI', { underline: true })
-      doc.moveDown(0.5)
+      // ============================================================
+      // SECTION B: IDHINI YA MKUU WA IDARA/KITENGO
+      // ============================================================
+      doc.fontSize(11).font('Helvetica-Bold').text('B. IDHINI YA MKUU WA IDARA/KITENGO', { underline: true })
+      doc.moveDown(0.4)
       
-      const driverStartY = doc.y
-      doc.fontSize(10).font('Helvetica')
-      doc.text('Jina Kamili:', leftMargin, driverStartY)
-      doc.text(`: ${request.driver.firstName} ${request.driver.lastName}`, leftMargin + labelWidth, driverStartY)
+      doc.fontSize(9).font('Helvetica')
+      const sectionBY = doc.y
       
-      doc.text('Namba ya Wafanyikazi:', leftMargin, driverStartY + 20)
-      doc.text(`: ${request.driver.employeeNumber || 'N/A'}`, leftMargin + labelWidth, driverStartY + 20)
+      // Get Head of Department approval
+      const headApproval = request.approvals.find(a => a.stage.toLowerCase().includes('head'))
       
-      doc.text('Barua Pepe:', leftMargin, driverStartY + 40)
-      doc.text(`: ${request.driver.email || 'N/A'}`, leftMargin + labelWidth, driverStartY + 40)
+      // Naridhia/Siridhii apatiwe huduma hiyo kama alivyoomba hapo juu kwa sababu
+      doc.text('Naridhia/Siridhii apatiwe huduma hiyo kama alivyoomba hapo juu kwa sababu:', leftMargin, sectionBY)
+      const headReason = headApproval?.reason || ''
+      doc.text(headReason, leftMargin, sectionBY + 12)
+      doc.moveTo(leftMargin + doc.widthOfString(headReason), sectionBY + 20).lineTo(rightMargin, sectionBY + 20).stroke()
       
-      doc.moveDown(1)
-
-      // Department Information Section
-      doc.fontSize(12).font('Helvetica-Bold').text('IDARA', { underline: true })
-      doc.moveDown(0.5)
+      // Jina la Mkuu wa Idara/Kitengo
+      doc.text('Jina la Mkuu wa Idara/Kitengo:', leftMargin, sectionBY + 32)
+      const headName = headApproval ? `${headApproval.approver.firstName} ${headApproval.approver.lastName}` : ''
+      doc.text(headName, leftMargin + 180, sectionBY + 32)
+      doc.moveTo(leftMargin + 180 + doc.widthOfString(headName), sectionBY + 40).lineTo(rightMargin, sectionBY + 40).stroke()
       
-      const deptStartY = doc.y
-      doc.fontSize(10).font('Helvetica')
-      doc.text('Jina la Idara:', leftMargin, deptStartY)
-      doc.text(`: ${request.department.name}`, leftMargin + labelWidth, deptStartY)
+      // Cheo
+      doc.text('Cheo:', leftMargin, sectionBY + 52)
+      const headTitle = headApproval?.approver.title || headApproval?.designation || ''
+      doc.text(headTitle, leftMargin + 140, sectionBY + 52)
+      doc.moveTo(leftMargin + 140 + doc.widthOfString(headTitle), sectionBY + 60).lineTo(rightMargin, sectionBY + 60).stroke()
       
-      doc.moveDown(1)
-
-      // Vehicle Information Section
-      doc.fontSize(12).font('Helvetica-Bold').text('MAELEZO YA GARI', { underline: true })
-      doc.moveDown(0.5)
+      // Saini
+      doc.text('Saini:', leftMargin, sectionBY + 72)
+      doc.moveTo(leftMargin + 140, sectionBY + 80).lineTo(leftMargin + 300, sectionBY + 80).stroke()
       
-      const vehicleStartY = doc.y
-      doc.fontSize(10).font('Helvetica')
-      doc.text('Namba ya Gari:', leftMargin, vehicleStartY)
-      doc.text(`: ${request.vehicle.vehicleNumber}`, leftMargin + labelWidth, vehicleStartY)
-      
-      doc.text('GPSA:', leftMargin, vehicleStartY + 20)
-      doc.text(`: ${request.vehicle.gpsa || 'N/A'}`, leftMargin + labelWidth, vehicleStartY + 20)
-      
-      doc.text('Aina ya Mafuta:', leftMargin, vehicleStartY + 40)
-      doc.text(`: ${request.vehicle.fuelType || request.fuelType}`, leftMargin + labelWidth, vehicleStartY + 40)
+      // Tarehe
+      doc.text('Tarehe:', leftMargin, sectionBY + 92)
+      const headDate = headApproval?.approvedAt ? new Date(headApproval.approvedAt).toLocaleDateString('sw-TZ') : ''
+      doc.text(headDate, leftMargin + 140, sectionBY + 92)
+      doc.moveTo(leftMargin + 140 + doc.widthOfString(headDate), sectionBY + 100).lineTo(leftMargin + 250, sectionBY + 100).stroke()
       
       doc.moveDown(1)
 
-      // Fuel Information Section
-      doc.fontSize(12).font('Helvetica-Bold').text('MAELEZO YA MAFUTA', { underline: true })
-      doc.moveDown(0.5)
+      // ============================================================
+      // SECTION C: IDHINI YA AFISA USAFIRISHAJI
+      // ============================================================
+      doc.fontSize(11).font('Helvetica-Bold').text('C. IDHINI YA AFISA USAFIRISHAJI', { underline: true })
+      doc.moveDown(0.4)
       
-      const fuelStartY = doc.y
-      doc.fontSize(10).font('Helvetica')
-      doc.text('Aina ya Mafuta:', leftMargin, fuelStartY)
-      doc.text(`: ${request.fuelType}`, leftMargin + labelWidth, fuelStartY)
+      doc.fontSize(9).font('Helvetica')
+      const sectionCY = doc.y
       
-      doc.text('Kiasi Ambacho Kimoombwa:', leftMargin, fuelStartY + 20)
-      doc.text(`: ${request.requestedLitres} Litres`, leftMargin + labelWidth, fuelStartY + 20)
+      // Get Transport Officer approval
+      const transportApproval = request.approvals.find(a => a.stage.toLowerCase().includes('transport'))
       
-      doc.text('Kiasi Ambacho Kidhinishwa:', leftMargin, fuelStartY + 40)
-      doc.text(`: ${request.approvedLitres || request.requestedLitres} Litres`, leftMargin + labelWidth, fuelStartY + 40)
+      // Apewe/asipewe Lita
+      doc.text('Apewe/asipewe Lita:', leftMargin, sectionCY)
+      const transportLitres = transportApproval?.litresApproved || request.approvedLitres || request.requestedLitres
+      doc.text(`${transportLitres}`, leftMargin + 140, sectionCY)
+      doc.moveTo(leftMargin + 140 + doc.widthOfString(`${transportLitres}`), sectionCY + 8).lineTo(rightMargin, sectionCY + 8).stroke()
+      
+      // kwa sababu
+      doc.text('kwa sababu:', leftMargin, sectionCY + 20)
+      const transportReason = transportApproval?.reason || ''
+      doc.text(transportReason, leftMargin, sectionCY + 32)
+      doc.moveTo(leftMargin + doc.widthOfString(transportReason), sectionCY + 40).lineTo(rightMargin, sectionCY + 40).stroke()
+      
+      // Logbook namba
+      doc.text('Logbook namba:', leftMargin, sectionCY + 52)
+      const logbookNum = transportApproval?.logbookNumber || ''
+      doc.text(logbookNum, leftMargin + 140, sectionCY + 52)
+      doc.moveTo(leftMargin + 140 + doc.widthOfString(logbookNum), sectionCY + 60).lineTo(rightMargin, sectionCY + 60).stroke()
+      
+      // To
+      doc.text('To:', leftMargin, sectionCY + 72)
+      const logbookTo = transportApproval?.logbookTo || ''
+      doc.text(logbookTo, leftMargin + 140, sectionCY + 72)
+      doc.moveTo(leftMargin + 140 + doc.widthOfString(logbookTo), sectionCY + 80).lineTo(rightMargin, sectionCY + 80).stroke()
+      
+      // Cheo
+      doc.text('Cheo:', leftMargin, sectionCY + 92)
+      const transportTitle = transportApproval?.approver.title || transportApproval?.designation || ''
+      doc.text(transportTitle, leftMargin + 140, sectionCY + 92)
+      doc.moveTo(leftMargin + 140 + doc.widthOfString(transportTitle), sectionCY + 100).lineTo(rightMargin, sectionCY + 100).stroke()
+      
+      // Saini
+      doc.text('Saini:', leftMargin, sectionCY + 112)
+      doc.moveTo(leftMargin + 140, sectionCY + 120).lineTo(leftMargin + 300, sectionCY + 120).stroke()
+      
+      // Tarehe
+      doc.text('Tarehe:', leftMargin, sectionCY + 132)
+      const transportDate = transportApproval?.approvedAt ? new Date(transportApproval.approvedAt).toLocaleDateString('sw-TZ') : ''
+      doc.text(transportDate, leftMargin + 140, sectionCY + 132)
+      doc.moveTo(leftMargin + 140 + doc.widthOfString(transportDate), sectionCY + 140).lineTo(leftMargin + 250, sectionCY + 140).stroke()
       
       doc.moveDown(1)
 
-      // Journey Information Section
-      doc.fontSize(12).font('Helvetica-Bold').text('Safari', { underline: true })
-      doc.moveDown(0.5)
+      // ============================================================
+      // SECTION D: ADA/DAHRM
+      // ============================================================
+      doc.fontSize(11).font('Helvetica-Bold').text('D. ADA/DAHRM', { underline: true })
+      doc.moveDown(0.4)
       
-      const journeyStartY = doc.y
-      doc.fontSize(10).font('Helvetica')
-      doc.text('Kwa ajili ya:', leftMargin, journeyStartY)
-      doc.text(`: ${request.purpose}`, leftMargin + labelWidth, journeyStartY)
+      doc.fontSize(9).font('Helvetica')
+      const sectionDY = doc.y
       
-      doc.text('Km za Kuanzia:', leftMargin, journeyStartY + 20)
-      doc.text(`: ${request.kmFrom}`, leftMargin + labelWidth, journeyStartY + 20)
+      // Get ADA approval
+      const adaApproval = request.approvals.find(a => a.stage.toLowerCase().includes('ada'))
       
-      doc.text('Km za Sasa:', leftMargin, journeyStartY + 40)
-      doc.text(`: ${request.kmTo}`, leftMargin + labelWidth, journeyStartY + 40)
+      // Naridhia/Siridhii
+      doc.text('Naridhia/Siridhii:', leftMargin, sectionDY)
+      const adaDecision = adaApproval?.approved ? 'Naridhia' : 'Siridhii'
+      doc.text(adaDecision, leftMargin + 140, sectionDY)
+      doc.moveTo(leftMargin + 140 + doc.widthOfString(adaDecision), sectionDY + 8).lineTo(rightMargin, sectionDY + 8).stroke()
       
-      doc.text('Km Zilizotumika:', leftMargin, journeyStartY + 60)
-      doc.text(`: ${request.kmUsed}`, leftMargin + labelWidth, journeyStartY + 60)
+      // kwa sababu
+      doc.text('kwa sababu:', leftMargin, sectionDY + 20)
+      const adaReason = adaApproval?.reason || ''
+      doc.text(adaReason, leftMargin, sectionDY + 32)
+      doc.moveTo(leftMargin + doc.widthOfString(adaReason), sectionDY + 40).lineTo(rightMargin, sectionDY + 40).stroke()
+      
+      // Jina
+      doc.text('Jina:', leftMargin, sectionDY + 52)
+      const adaName = adaApproval ? `${adaApproval.approver.firstName} ${adaApproval.approver.lastName}` : 
+                      (request.finalApprover ? `${request.finalApprover.firstName} ${request.finalApprover.lastName}` : '')
+      doc.text(adaName, leftMargin + 140, sectionDY + 52)
+      doc.moveTo(leftMargin + 140 + doc.widthOfString(adaName), sectionDY + 60).lineTo(rightMargin, sectionDY + 60).stroke()
+      
+      // Cheo
+      doc.text('Cheo:', leftMargin, sectionDY + 72)
+      const adaTitle = adaApproval?.approver.title || adaApproval?.designation || 
+                      (request.finalApprover?.title || 'ADA')
+      doc.text(adaTitle, leftMargin + 140, sectionDY + 72)
+      doc.moveTo(leftMargin + 140 + doc.widthOfString(adaTitle), sectionDY + 80).lineTo(rightMargin, sectionDY + 80).stroke()
+      
+      // Saini
+      doc.text('Saini:', leftMargin, sectionDY + 92)
+      doc.moveTo(leftMargin + 140, sectionDY + 100).lineTo(leftMargin + 300, sectionDY + 100).stroke()
+      
+      // Tarehe
+      doc.text('Tarehe:', leftMargin, sectionDY + 112)
+      const adaDate = adaApproval?.approvedAt ? new Date(adaApproval.approvedAt).toLocaleDateString('sw-TZ') : 
+                     (request.finalApprovedAt ? new Date(request.finalApprovedAt).toLocaleDateString('sw-TZ') : '')
+      doc.text(adaDate, leftMargin + 140, sectionDY + 112)
+      doc.moveTo(leftMargin + 140 + doc.widthOfString(adaDate), sectionDY + 120).lineTo(leftMargin + 250, sectionDY + 120).stroke()
       
       doc.moveDown(1)
 
-      // Approvals Section
-      if (request.approvals && request.approvals.length > 0) {
-        doc.fontSize(12).font('Helvetica-Bold').text('IDHINI ZILIZOTOLEWA', { underline: true })
-        doc.moveDown(0.5)
-        
-        let approvalY = doc.y
-        doc.fontSize(10).font('Helvetica')
-        
-        request.approvals.forEach((approval, index) => {
-          if (approvalY > 700) {
-            doc.addPage()
-            approvalY = 50
-          }
-          
-          const approverName = `${approval.approver.firstName} ${approval.approver.lastName}`
-          const designation = approval.approver.title || approval.stage
-          
-          doc.text(`Hatua ${index + 1}: ${approval.stage}`, leftMargin, approvalY)
-          doc.text(`Idhinishwa na: ${approverName}`, leftMargin, approvalY + 20)
-          doc.text(`Cheo: ${designation}`, leftMargin, approvalY + 40)
-          
-          if (approval.approvedAt) {
-            doc.text(`Tarehe: ${new Date(approval.approvedAt).toLocaleDateString('sw-TZ')}`, leftMargin, approvalY + 60)
-          }
-          
-          if (approval.litresApproved) {
-            doc.text(`Lita Zilizoidhinishwa: ${approval.litresApproved} Litres`, leftMargin, approvalY + 80)
-          }
-          
-          approvalY += 100
-        })
-        
-        doc.y = approvalY
-        doc.moveDown(0.5)
-      }
-
-      // Final Approver Section
-      if (request.finalApprover) {
-        doc.fontSize(12).font('Helvetica-Bold').text('IDHINISHAJI WA MWISHO', { underline: true })
-        doc.moveDown(0.5)
-        
-        const finalApproverY = doc.y
-        doc.fontSize(10).font('Helvetica')
-        doc.text('Jina:', leftMargin, finalApproverY)
-        doc.text(`: ${request.finalApprover.firstName} ${request.finalApprover.lastName}`, leftMargin + labelWidth, finalApproverY)
-        
-        doc.text('Cheo:', leftMargin, finalApproverY + 20)
-        doc.text(`: ${request.finalApprover.title || 'ADA'}`, leftMargin + labelWidth, finalApproverY + 20)
-        
-        doc.moveDown(1)
-      }
-
-      // Signature Section
-      doc.moveDown(2)
-      const signatureY = doc.y
+      // ============================================================
+      // SECTION E: SEHEMU YA UNUNUZI NA UGAVI
+      // ============================================================
+      doc.fontSize(11).font('Helvetica-Bold').text('E. SEHEMU YA UNUNUZI NA UGAVI', { underline: true })
+      doc.moveDown(0.4)
       
-      doc.fontSize(10).font('Helvetica')
-      doc.text('Sahihi ya Afisa Mkuu:', leftMargin, signatureY)
-      doc.moveTo(leftMargin, signatureY + 15).lineTo(leftMargin + 150, signatureY + 15).stroke()
-      doc.text('Tarehe:', leftMargin, signatureY + 25)
-      doc.moveTo(leftMargin, signatureY + 35).lineTo(leftMargin + 100, signatureY + 35).stroke()
+      doc.fontSize(9).font('Helvetica')
+      const sectionEY = doc.y
       
-      doc.text('Sahihi ya Mtoaji Mafuta:', leftMargin + 200, signatureY)
-      doc.moveTo(leftMargin + 200, signatureY + 15).lineTo(leftMargin + 350, signatureY + 15).stroke()
-      doc.text('Tarehe:', leftMargin + 200, signatureY + 25)
-      doc.moveTo(leftMargin + 200, signatureY + 35).lineTo(leftMargin + 300, signatureY + 35).stroke()
+      // Token Number (if available from fuel issuance)
+      doc.text('Token Number:', leftMargin, sectionEY)
+      const tokenNum = request.fuelIssuance?.tokenNumber || ''
+      doc.text(tokenNum, leftMargin + 140, sectionEY)
+      doc.moveTo(leftMargin + 140 + doc.widthOfString(tokenNum), sectionEY + 8).lineTo(rightMargin, sectionEY + 8).stroke()
+      
+      // Lita zilizotolewa
+      doc.text('Lita zilizotolewa:', leftMargin, sectionEY + 20)
+      const issuedLitres = request.fuelIssuance?.litresIssued || request.issuedLitres || ''
+      doc.text(`${issuedLitres}`, leftMargin + 140, sectionEY + 20)
+      doc.moveTo(leftMargin + 140 + doc.widthOfString(`${issuedLitres}`), sectionEY + 28).lineTo(rightMargin, sectionEY + 28).stroke()
+      
+      // Jina la Mtoaji
+      doc.text('Jina la Mtoaji:', leftMargin, sectionEY + 40)
+      const issuerName = request.fuelIssuance ? 'Issued' : ''
+      doc.text(issuerName, leftMargin + 140, sectionEY + 40)
+      doc.moveTo(leftMargin + 140 + doc.widthOfString(issuerName), sectionEY + 48).lineTo(rightMargin, sectionEY + 48).stroke()
+      
+      // Cheo
+      doc.text('Cheo:', leftMargin, sectionEY + 60)
+      const issuerTitle = request.fuelIssuance?.designation || ''
+      doc.text(issuerTitle, leftMargin + 140, sectionEY + 60)
+      doc.moveTo(leftMargin + 140 + doc.widthOfString(issuerTitle), sectionEY + 68).lineTo(rightMargin, sectionEY + 68).stroke()
+      
+      // Saini
+      doc.text('Saini:', leftMargin, sectionEY + 80)
+      doc.moveTo(leftMargin + 140, sectionEY + 88).lineTo(leftMargin + 300, sectionEY + 88).stroke()
+      
+      // Tarehe
+      doc.text('Tarehe:', leftMargin, sectionEY + 100)
+      const issueDate = request.fuelIssuance?.issuedAt ? new Date(request.fuelIssuance.issuedAt).toLocaleDateString('sw-TZ') : ''
+      doc.text(issueDate, leftMargin + 140, sectionEY + 100)
+      doc.moveTo(leftMargin + 140 + doc.widthOfString(issueDate), sectionEY + 108).lineTo(leftMargin + 250, sectionEY + 108).stroke()
+      
+      doc.moveDown(1.5)
 
-      // Footer
-      doc.moveDown(3)
+      // ============================================================
+      // FOOTER
+      // ============================================================
       doc.fontSize(8).font('Helvetica').text('Hiki ni hatari rasmi ya mfumo wa Kibali cha Kuchukua Mafuta', { align: 'center' })
       doc.text(`Imetengenezwa mnamo: ${new Date().toLocaleString('sw-TZ')}`, { align: 'center' })
 
