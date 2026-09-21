@@ -209,6 +209,19 @@ export class FuelRequestsService {
           // Driver sees their own requests including rejected ones
           where.status = { in: ['PENDING_HEAD_APPROVAL', 'HEAD_REJECTED', 'PENDING_TRANSPORT_APPROVAL', 'TRANSPORT_REJECTED', 'PENDING_DA_APPROVAL', 'ADA_REJECTED', 'FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE', 'COMPLETED', 'CANCELLED'] }
         }
+      } else if (filters?.all === 'true') {
+        // Special case: all=true bypasses role-based status filters
+        // Only apply role-based authorization (driverId, departmentId)
+        // Keep status unrestricted
+      } else if (filters?.status === 'REJECTED' || filters?.status === 'rejected') {
+        // Special case: Rejected status filter - include all rejection statuses
+        where.status = { in: ['HEAD_REJECTED', 'TRANSPORT_REJECTED', 'ADA_REJECTED', 'CANCELLED'] }
+      } else if (filters?.status === 'COMPLETED' || filters?.status === 'completed') {
+        // Special case: Completed status filter - include fully approved, pending fuel issuance, and completed
+        where.status = { in: ['FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE', 'COMPLETED'] }
+      } else if (filters?.status === 'APPROVED' || filters?.status === 'approved') {
+        // Special case: Approved status filter - include fully approved and pending fuel issuance
+        where.status = { in: ['FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE'] }
       } else {
         // Status filter: return ONLY requests with that exact status
         // Do NOT include interacted requests with different statuses
