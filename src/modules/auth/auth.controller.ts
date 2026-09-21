@@ -19,7 +19,26 @@ export class AuthController {
       const result = await authService.login(email, password, req)
       res.json(successResponse(result, 'Login successful'))
     } catch (error: any) {
-      res.status(401).json(errorResponse(error.message))
+      // Only expected authentication failures should be returned as 401.
+      // Do not disguise a Prisma/database failure as invalid credentials: it
+      // prevents production logs from identifying the real operational issue.
+      const expectedAuthFailure = [
+        'Invalid credentials',
+        'Account is deactivated',
+        'Account is locked',
+      ].some(message => error.message?.startsWith(message))
+
+      if (expectedAuthFailure) {
+        return res.status(401).json(errorResponse(error.message))
+      }
+
+      console.error('[Auth] Login failed unexpectedly', {
+        name: error.name,
+        code: error.code,
+        message: error.message,
+        meta: error.meta,
+      })
+      return res.status(500).json(errorResponse('Unable to complete login. Please try again later.'))
     }
   }
 
@@ -29,7 +48,17 @@ export class AuthController {
       const result = await authService.refreshToken(refreshToken)
       res.json(successResponse(result, 'Token refreshed successfully'))
     } catch (error: any) {
-      res.status(401).json(errorResponse(error.message))
+      if (error.message === 'Invalid refresh token' || error.message === 'User not found or inactive') {
+        return res.status(401).json(errorResponse(error.message))
+      }
+
+      console.error('[Auth] Token refresh failed unexpectedly', {
+        name: error.name,
+        code: error.code,
+        message: error.message,
+        meta: error.meta,
+      })
+      return res.status(500).json(errorResponse('Unable to refresh session. Please login again.'))
     }
   }
 

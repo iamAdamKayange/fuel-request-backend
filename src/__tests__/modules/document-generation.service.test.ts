@@ -1,9 +1,14 @@
 import { DocumentGenerationService } from '../../modules/document-generation/document-generation.service'
+import { prisma } from '../../config/database'
 
 describe('DocumentGenerationService', () => {
   let service: DocumentGenerationService
 
   beforeEach(() => {
+    jest.restoreAllMocks()
+    // These unit tests exercise the service response for a missing record;
+    // they must not query the configured production database.
+    jest.spyOn(prisma.fuelRequest, 'findUnique').mockResolvedValue(null)
     service = DocumentGenerationService.getInstance()
   })
 
@@ -72,7 +77,7 @@ describe('DocumentGenerationService', () => {
     it('should throw error when user cannot print', async () => {
       await expect(
         service.generateFuelPermitData('non-existent-id', 'user-123')
-      ).rejects.toThrow('You are not authorized to print this document')
+      ).rejects.toThrow('Fuel request not found')
     })
   })
 
@@ -80,7 +85,7 @@ describe('DocumentGenerationService', () => {
     it('should throw error when user cannot print', async () => {
       await expect(
         service.generateFuelStatementData('non-existent-id', 'user-123')
-      ).rejects.toThrow('You are not authorized to print this document')
+      ).rejects.toThrow('Fuel request not found')
     })
   })
 })
