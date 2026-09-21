@@ -17,7 +17,7 @@ export class AuthController {
     try {
       const { email, password } = req.body
       const result = await authService.login(email, password, req)
-      res.json(successResponse(result, 'Login successful'))
+      return res.json(successResponse(result, 'Login successful'))
     } catch (error: any) {
       // Only expected authentication failures should be returned as 401.
       // Do not disguise a Prisma/database failure as invalid credentials: it
@@ -46,7 +46,7 @@ export class AuthController {
     try {
       const { refreshToken } = req.body
       const result = await authService.refreshToken(refreshToken)
-      res.json(successResponse(result, 'Token refreshed successfully'))
+      return res.json(successResponse(result, 'Token refreshed successfully'))
     } catch (error: any) {
       if (error.message === 'Invalid refresh token' || error.message === 'User not found or inactive') {
         return res.status(401).json(errorResponse(error.message))
