@@ -31,9 +31,10 @@ export class DocumentGenerationService {
       return { canPrint: false, reason: 'Fuel request not found' }
     }
 
-    // Can only print if request is fully approved
-    if (request.status !== 'FULLY_APPROVED') {
-      return { canPrint: false, reason: `Request is not fully approved (current status: ${request.status})` }
+    // The permit remains an official record after fuel issuance. Completion
+    // must not remove the final approver's or Procurement's existing access.
+    if (request.status !== 'FULLY_APPROVED' && request.status !== 'COMPLETED') {
+      return { canPrint: false, reason: `Request is not fully approved or completed (current status: ${request.status})` }
     }
 
     // Get user role

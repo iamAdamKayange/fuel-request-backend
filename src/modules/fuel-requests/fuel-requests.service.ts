@@ -666,9 +666,6 @@ export class FuelRequestsService {
       }
     }
 
-    // Get the pending status for this role (for pending count)
-    const pendingStatus = this.getPendingStatusForRole(role)
-
     // Get rejected statuses this role can see (for rejected count)
     const rejectedStatuses = this.getRejectedStatusesForRole(role)
 
@@ -683,7 +680,7 @@ export class FuelRequestsService {
       prisma.fuelRequest.count({
         where: {
           ...where,
-          status: pendingStatus
+          status: { in: this.getPendingStatusesForRole(role) }
         }
       }),
       prisma.fuelRequest.count({
@@ -738,10 +735,20 @@ export class FuelRequestsService {
       HEAD_OF_DEPARTMENT: 'PENDING_HEAD_APPROVAL',
       TRANSPORT_OFFICER: 'PENDING_TRANSPORT_APPROVAL',
       ADA_DAHRM: 'PENDING_DA_APPROVAL',
-      PROCUREMENT: 'PENDING_FUEL_ISSUANCE',
+      PROCUREMENT: 'APPROVED',
       ADMIN: 'PENDING_HEAD_APPROVAL' // Admin sees all, default to first stage
     }
     return statusMap[role] || 'PENDING_HEAD_APPROVAL'
+  }
+
+  /** Statuses that represent work currently awaiting the role's action. */
+  private getPendingStatusesForRole(role: string): string[] {
+    if (role === 'PROCUREMENT') {
+      // FULLY_APPROVED is the current workflow status after ADA approval;
+      // retain PENDING_FUEL_ISSUANCE for records created by earlier versions.
+      return ['FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE']
+    }
+    return [this.getPendingStatusForRole(role)]
   }
 
   /**
