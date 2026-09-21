@@ -27,6 +27,17 @@ router.get(
 )
 
 /**
+ * @route GET /api/documents/:id/statement/pdf
+ * @description Generate Fuel Statement in the official PDF layout
+ * @access Private - Only TRANSPORT_OFFICER or PROCUREMENT
+ */
+router.get(
+  '/:id/statement/pdf',
+  requireAuth,
+  documentGenerationController.generateFuelStatementPDF
+)
+
+/**
  * @route GET /api/documents/:id/statement
  * @description Generate Fuel Statement document
  * @access Private - Only TRANSPORT_OFFICER or PROCUREMENT
