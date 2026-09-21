@@ -135,7 +135,7 @@ describe('FuelRequestsService - Object-Level Authorization', () => {
       expect(whereClause.driverId).toBe('user-123')
     })
 
-    it('should include approval-based OR condition for approvers', async () => {
+    it('should keep the head list constrained to its department and pending stage', async () => {
       const mockFindMany = jest.fn().mockResolvedValue([])
       jest.spyOn(require('../../config/database').prisma.fuelRequest, 'findMany').mockImplementation(mockFindMany)
 
@@ -143,8 +143,9 @@ describe('FuelRequestsService - Object-Level Authorization', () => {
 
       expect(mockFindMany).toHaveBeenCalled()
       const whereClause = mockFindMany.mock.calls[0][0].where
-      expect(whereClause.OR).toBeDefined()
-      expect(whereClause.OR.some((cond: any) => cond.approvals?.some?.approverId === 'head-456')).toBe(true)
+      expect(whereClause.departmentId).toBe('dept-123')
+      expect(whereClause.status).toBe('PENDING_HEAD_APPROVAL')
+      expect(whereClause.OR).toBeUndefined()
     })
   })
 })

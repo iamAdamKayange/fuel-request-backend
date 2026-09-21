@@ -38,14 +38,7 @@ describe('FuelRequestsService', () => {
       expect(mockFindMany).toHaveBeenCalled()
       const whereClause = mockFindMany.mock.calls[0][0].where
       
-      // With approval tracking, status may be in OR array
-      // Check if status is either directly set or in OR conditions
-      const hasStatusDirectly = whereClause.status?.in?.includes('PENDING_HEAD_APPROVAL')
-      const hasStatusInOr = whereClause.OR?.some((condition: any) => 
-        condition.status?.in?.includes('PENDING_HEAD_APPROVAL')
-      )
-      
-      expect(hasStatusDirectly || hasStatusInOr).toBe(true)
+      expect(whereClause.status).toBe('PENDING_HEAD_APPROVAL')
       
       // Verify department is set
       expect(whereClause.departmentId).toBe('dept-123')
@@ -68,14 +61,13 @@ describe('FuelRequestsService', () => {
       
       const whereClause = mockFindMany.mock.calls[0][0].where
       
-      // Status should be the explicit filter, not the default
-      expect(whereClause.status).toBe('FULLY_APPROVED')
-      expect(whereClause.status.in).toBeUndefined()
+      // Status should be the explicit filter, not the default.
+      expect(whereClause.status.in).toEqual(['FULLY_APPROVED'])
     })
   })
 
-  describe('getFuelRequests - approval tracking', () => {
-    it('should include approval tracking OR condition for approvers', async () => {
+  describe('getFuelRequests - status isolation', () => {
+    it('should not mix approval history into the default procurement list', async () => {
       const mockUserId = 'approver-id'
       const mockRole = 'PROCUREMENT'
       
@@ -86,15 +78,10 @@ describe('FuelRequestsService', () => {
       
       const whereClause = mockFindMany.mock.calls[0][0].where
       
-      // Should have OR condition for approval tracking
-      expect(whereClause.OR).toBeDefined()
-      const approvalCondition = whereClause.OR.find((condition: any) => 
-        condition.approvals?.some?.approverId === mockUserId
-      )
-      expect(approvalCondition).toBeDefined()
+      expect(whereClause.OR).toBeUndefined()
     })
 
-    it('should include approval tracking for TRANSPORT_OFFICER', async () => {
+    it('should not mix approval history into the transport pending list', async () => {
       const mockUserId = 'transport-id'
       const mockRole = 'TRANSPORT_OFFICER'
       
@@ -105,14 +92,10 @@ describe('FuelRequestsService', () => {
       
       const whereClause = mockFindMany.mock.calls[0][0].where
       
-      expect(whereClause.OR).toBeDefined()
-      const approvalCondition = whereClause.OR.find((condition: any) => 
-        condition.approvals?.some?.approverId === mockUserId
-      )
-      expect(approvalCondition).toBeDefined()
+      expect(whereClause.status).toBe('PENDING_TRANSPORT_APPROVAL')
     })
 
-    it('should include approval tracking for ADA_DAHRM', async () => {
+    it('should not mix approval history into the ADA pending list', async () => {
       const mockUserId = 'ada-id'
       const mockRole = 'ADA_DAHRM'
       
@@ -123,14 +106,10 @@ describe('FuelRequestsService', () => {
       
       const whereClause = mockFindMany.mock.calls[0][0].where
       
-      expect(whereClause.OR).toBeDefined()
-      const approvalCondition = whereClause.OR.find((condition: any) => 
-        condition.approvals?.some?.approverId === mockUserId
-      )
-      expect(approvalCondition).toBeDefined()
+      expect(whereClause.status).toBe('PENDING_DA_APPROVAL')
     })
 
-    it('should include approval tracking for HEAD_OF_DEPARTMENT', async () => {
+    it('should keep the head default list within the department and pending stage', async () => {
       const mockUserId = 'head-id'
       const mockRole = 'HEAD_OF_DEPARTMENT'
       
@@ -146,11 +125,8 @@ describe('FuelRequestsService', () => {
       
       const whereClause = mockFindMany.mock.calls[0][0].where
       
-      expect(whereClause.OR).toBeDefined()
-      const approvalCondition = whereClause.OR.find((condition: any) => 
-        condition.approvals?.some?.approverId === mockUserId
-      )
-      expect(approvalCondition).toBeDefined()
+      expect(whereClause.departmentId).toBe('dept-123')
+      expect(whereClause.status).toBe('PENDING_HEAD_APPROVAL')
     })
 
     it('should NOT include approval tracking for DRIVER', async () => {
@@ -164,11 +140,7 @@ describe('FuelRequestsService', () => {
       
       const whereClause = mockFindMany.mock.calls[0][0].where
       
-      // Driver should not have approval tracking OR
-      const approvalCondition = whereClause.OR?.find((condition: any) => 
-        condition.approvals?.some?.approverId === mockUserId
-      )
-      expect(approvalCondition).toBeUndefined()
+      expect(whereClause.OR).toBeUndefined()
     })
   })
 
@@ -186,7 +158,8 @@ describe('FuelRequestsService', () => {
       expect(whereClause.status.in).toContain('FULLY_APPROVED')
       expect(whereClause.status.in).toContain('PENDING_FUEL_ISSUANCE')
       expect(whereClause.status.in).toContain('COMPLETED')
-      expect(whereClause.status.in).toContain('ADA_REJECTED')
+      expect(whereClause.status.in).toContain('CANCELLED')
+      expect(whereClause.status.in).not.toContain('ADA_REJECTED')
     })
 
     it('should apply correct status filter for TRANSPORT_OFFICER', async () => {
@@ -199,9 +172,7 @@ describe('FuelRequestsService', () => {
       
       const whereClause = mockFindMany.mock.calls[0][0].where
       
-      expect(whereClause.status.in).toContain('PENDING_TRANSPORT_APPROVAL')
-      expect(whereClause.status.in).toContain('TRANSPORT_REJECTED')
-      expect(whereClause.status.in).toContain('FULLY_APPROVED')
+      expect(whereClause.status).toBe('PENDING_TRANSPORT_APPROVAL')
     })
 
     it('should apply correct status filter for ADA_DAHRM', async () => {
@@ -214,9 +185,7 @@ describe('FuelRequestsService', () => {
       
       const whereClause = mockFindMany.mock.calls[0][0].where
       
-      expect(whereClause.status.in).toContain('PENDING_DA_APPROVAL')
-      expect(whereClause.status.in).toContain('ADA_REJECTED')
-      expect(whereClause.status.in).toContain('FULLY_APPROVED')
+      expect(whereClause.status).toBe('PENDING_DA_APPROVAL')
     })
 
     it('should apply correct status filter for DRIVER', async () => {
@@ -237,8 +206,8 @@ describe('FuelRequestsService', () => {
     })
   })
 
-  describe('getFuelRequests - search with approval tracking', () => {
-    it('should combine search OR with approval tracking OR using simple spread', async () => {
+  describe('getFuelRequests - search', () => {
+    it('should combine search with the role status scope without an authorization OR', async () => {
       const mockUserId = 'approver-id'
       const mockRole = 'PROCUREMENT'
       const mockFilters = { search: 'test' }
@@ -250,9 +219,8 @@ describe('FuelRequestsService', () => {
       
       const whereClause = mockFindMany.mock.calls[0][0].where
       
-      // Should have OR with search conditions and approval condition
       expect(whereClause.OR).toBeDefined()
-      expect(whereClause.OR.length).toBeGreaterThan(4) // At least 4 search conditions + approval
+      expect(whereClause.OR.length).toBe(4)
       
       // Verify search conditions are present
       const hasRequestNumberSearch = whereClause.OR.some((condition: any) => 
@@ -273,11 +241,7 @@ describe('FuelRequestsService', () => {
       expect(hasDriverLastNameSearch).toBe(true)
       expect(hasVehicleSearch).toBe(true)
       
-      // Verify approval condition is present
-      const approvalCondition = whereClause.OR.find((condition: any) => 
-        condition.approvals?.some?.approverId === mockUserId
-      )
-      expect(approvalCondition).toBeDefined()
+      expect(whereClause.status.in).toContain('FULLY_APPROVED')
     })
   })
 })

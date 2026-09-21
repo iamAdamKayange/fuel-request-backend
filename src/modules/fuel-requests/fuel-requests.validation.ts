@@ -28,6 +28,8 @@ export const getFuelRequestsSchema = z.object({
     search: z.string().optional(),
     fromDate: z.string().optional().transform(val => val ? new Date(val) : undefined),
     toDate: z.string().optional().transform(val => val ? new Date(val) : undefined),
+    interacted: z.enum(['true', 'false']).optional(),
+    all: z.enum(['true', 'false']).optional(),
   }),
 })
 

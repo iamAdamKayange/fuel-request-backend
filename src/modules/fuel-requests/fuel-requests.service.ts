@@ -163,12 +163,24 @@ export class FuelRequestsService {
   async getFuelRequests(page: number = 1, limit: number = 10, filters?: any, userId?: string, role?: string) {
     const skip = (page - 1) * limit
     const where: any = {}
+    const workflowStatuses = this.getWorkflowStatusesForRole(role || '')
+    const statusGroups: Record<string, string[]> = {
+      REJECTED: ['HEAD_REJECTED', 'TRANSPORT_REJECTED', 'ADA_REJECTED', 'CANCELLED'],
+      COMPLETED: ['FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE', 'COMPLETED'],
+      APPROVED: ['FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE'],
+      HISTORY: ['HEAD_REJECTED', 'TRANSPORT_REJECTED', 'ADA_REJECTED', 'CANCELLED', 'FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE', 'COMPLETED'],
+    }
 
     // Interacted filter: show only requests user has interacted with (approval record)
     if (filters?.interacted && userId && ['HEAD_OF_DEPARTMENT', 'TRANSPORT_OFFICER', 'ADA_DAHRM', 'PROCUREMENT'].includes(role || '')) {
-      where.approvals = {
-        some: {
-          approverId: userId
+      if (role === 'PROCUREMENT') {
+        // Procurement interacts by issuing fuel, not by creating an Approval.
+        where.fuelIssuance = { is: { issuedBy: userId } }
+      } else {
+        where.approvals = {
+          some: {
+            approverId: userId
+          }
         }
       }
       // Skip other role-based filtering when interacted filter is active
@@ -188,45 +200,30 @@ export class FuelRequestsService {
         }
       }
 
-      // Status filtering - apply only if no explicit status filter provided
-      if (!filters?.status) {
-        if (role === 'ADMIN') {
-          // ADMIN sees all requests - no status filter
-          // Keep where clause as is (no status restriction)
-        } else if (role === 'PROCUREMENT') {
-          // PROCUREMENT sees fully approved, pending fuel issuance, completed, and rejected requests
-          where.status = { in: ['FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE', 'COMPLETED', 'ADA_REJECTED'] }
-        } else if (role === 'TRANSPORT_OFFICER') {
-          // Transport Officer sees only pending work (their stage)
-          where.status = 'PENDING_TRANSPORT_APPROVAL'
-        } else if (role === 'ADA_DAHRM') {
-          // ADA sees only pending work (their stage)
-          where.status = 'PENDING_DA_APPROVAL'
-        } else if (role === 'HEAD_OF_DEPARTMENT') {
-          // HoD sees only pending work (their stage)
-          where.status = 'PENDING_HEAD_APPROVAL'
-        } else if (role === 'DRIVER') {
-          // Driver sees their own requests including rejected ones
-          where.status = { in: ['PENDING_HEAD_APPROVAL', 'HEAD_REJECTED', 'PENDING_TRANSPORT_APPROVAL', 'TRANSPORT_REJECTED', 'PENDING_DA_APPROVAL', 'ADA_REJECTED', 'FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE', 'COMPLETED', 'CANCELLED'] }
+      const requestedStatus = filters?.status?.toUpperCase()
+      const requestedStatuses = requestedStatus
+        ? (statusGroups[requestedStatus] || [filters.status])
+        : undefined
+      const isAllRequests = filters?.all === true || filters?.all === 'true'
+
+      // A workflow role can list only records it can open by id.  `all=true`
+      // removes the default pending-stage view, but never bypasses that access scope.
+      if (workflowStatuses) {
+        const visibleStatuses = requestedStatuses
+          ? requestedStatuses.filter(status => workflowStatuses.includes(status))
+          : workflowStatuses
+
+        if (requestedStatuses || isAllRequests || role === 'PROCUREMENT') {
+          where.status = { in: visibleStatuses }
+        } else {
+          where.status = this.getPendingStatusForRole(role || '')
         }
-      } else if (filters?.all === 'true') {
-        // Special case: all=true bypasses role-based status filters
-        // Only apply role-based authorization (driverId, departmentId)
-        // Keep status unrestricted
-      } else if (filters?.status === 'REJECTED' || filters?.status === 'rejected') {
-        // Special case: Rejected status filter - include all rejection statuses
-        where.status = { in: ['HEAD_REJECTED', 'TRANSPORT_REJECTED', 'ADA_REJECTED', 'CANCELLED'] }
-      } else if (filters?.status === 'COMPLETED' || filters?.status === 'completed') {
-        // Special case: Completed status filter - include fully approved, pending fuel issuance, and completed
-        where.status = { in: ['FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE', 'COMPLETED'] }
-      } else if (filters?.status === 'APPROVED' || filters?.status === 'approved') {
-        // Special case: Approved status filter - include fully approved and pending fuel issuance
-        where.status = { in: ['FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE'] }
-      } else {
-        // Status filter: return ONLY requests with that exact status
-        // Do NOT include interacted requests with different statuses
-        // Interacted requests are available through the separate "Zilizoshughulikiwa" filter
-        where.status = filters.status
+      } else if (requestedStatuses) {
+        where.status = { in: requestedStatuses }
+      } else if (!isAllRequests && role === 'HEAD_OF_DEPARTMENT') {
+        where.status = 'PENDING_HEAD_APPROVAL'
+      } else if (!isAllRequests && role === 'DRIVER') {
+        // Drivers own their records, so their default list is their complete history.
       }
     }
 
@@ -344,6 +341,7 @@ export class FuelRequestsService {
           approvals: {
             select: {
               id: true,
+              approverId: true,
               stage: true,
               approved: true,
               approvedAt: true,
@@ -358,6 +356,12 @@ export class FuelRequestsService {
               },
             },
             orderBy: { approvedAt: 'asc' },
+          },
+          fuelIssuance: {
+            select: {
+              issuedBy: true,
+              issuedAt: true,
+            },
           },
         },
         skip,
@@ -375,6 +379,10 @@ export class FuelRequestsService {
         stage: userApproval.stage,
         action: userApproval.approved ? 'approved' : 'rejected',
         at: userApproval.approvedAt
+      } : request.fuelIssuance?.issuedBy === userId ? {
+        stage: 'ISSUANCE',
+        action: 'issued',
+        at: request.fuelIssuance?.issuedAt,
       } : null
 
       return {
@@ -469,64 +477,8 @@ export class FuelRequestsService {
       }
     }
 
-    const allowedStatusByRole: Record<string, string[]> = {
-      DRIVER: [
-        'PENDING_HEAD_APPROVAL',
-        'HEAD_REJECTED',
-        'PENDING_TRANSPORT_APPROVAL',
-        'TRANSPORT_REJECTED',
-        'PENDING_DA_APPROVAL',
-        'ADA_REJECTED',
-        'FULLY_APPROVED',
-        'PENDING_FUEL_ISSUANCE',
-        'COMPLETED',
-        'CANCELLED',
-      ],
-      HEAD_OF_DEPARTMENT: [
-        'PENDING_HEAD_APPROVAL',
-        'HEAD_APPROVED',
-        'HEAD_REJECTED',
-        'PENDING_TRANSPORT_APPROVAL',
-        'TRANSPORT_APPROVED',
-        'TRANSPORT_REJECTED',
-        'PENDING_DA_APPROVAL',
-        'ADA_APPROVED',
-        'ADA_REJECTED',
-        'FULLY_APPROVED',
-        'PENDING_FUEL_ISSUANCE',
-        'COMPLETED',
-        'CANCELLED',
-      ],
-      TRANSPORT_OFFICER: [
-        'PENDING_TRANSPORT_APPROVAL',
-        'TRANSPORT_APPROVED',
-        'TRANSPORT_REJECTED',
-        'PENDING_DA_APPROVAL',
-        'ADA_APPROVED',
-        'ADA_REJECTED',
-        'FULLY_APPROVED',
-        'PENDING_FUEL_ISSUANCE',
-        'COMPLETED',
-        'CANCELLED',
-      ],
-      ADA_DAHRM: [
-        'PENDING_DA_APPROVAL',
-        'ADA_APPROVED',
-        'ADA_REJECTED',
-        'FULLY_APPROVED',
-        'PENDING_FUEL_ISSUANCE',
-        'COMPLETED',
-        'CANCELLED',
-      ],
-      PROCUREMENT: [
-        'FULLY_APPROVED',
-        'PENDING_FUEL_ISSUANCE',
-        'COMPLETED',
-        'CANCELLED',
-      ],
-    }
-
-    if (role && allowedStatusByRole[role] && !allowedStatusByRole[role].includes(request.status)) {
+    const workflowStatuses = this.getWorkflowStatusesForRole(role || '')
+    if (workflowStatuses && !workflowStatuses.includes(request.status)) {
       throw new Error('This request is not assigned to your workflow stage')
     }
 
@@ -707,14 +659,11 @@ export class FuelRequestsService {
         where.departmentId = user.departmentId
       }
       // HoD sees all department requests (no status filter for total)
-    } else if (role === 'TRANSPORT_OFFICER') {
-      // Transport Officer sees all requests (no status filter for total)
-    } else if (role === 'ADA_DAHRM') {
-      // ADA sees all requests (no status filter for total)
-    } else if (role === 'PROCUREMENT') {
-      // PROCUREMENT sees fully approved, pending fuel issuance, completed, and rejected requests
-      // This is the only role with status restrictions even for total
-      where.status = { in: ['FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE', 'COMPLETED', 'ADA_REJECTED'] }
+    } else {
+      const workflowStatuses = this.getWorkflowStatusesForRole(role)
+      if (workflowStatuses) {
+        where.status = { in: workflowStatuses }
+      }
     }
 
     // Get the pending status for this role (for pending count)
@@ -754,7 +703,7 @@ export class FuelRequestsService {
         _sum: { issuedLitres: true, approvedLitres: true, requestedLitres: true }
       }),
       // Interacted count for approver roles - matches interacted=true filter
-      ['HEAD_OF_DEPARTMENT', 'TRANSPORT_OFFICER', 'ADA_DAHRM', 'PROCUREMENT'].includes(role)
+      ['HEAD_OF_DEPARTMENT', 'TRANSPORT_OFFICER', 'ADA_DAHRM'].includes(role)
         ? prisma.fuelRequest.count({
             where: {
               approvals: {
@@ -764,7 +713,9 @@ export class FuelRequestsService {
               }
             }
           })
-        : Promise.resolve(0)
+        : role === 'PROCUREMENT'
+          ? prisma.fuelRequest.count({ where: { fuelIssuance: { is: { issuedBy: userId } } } })
+          : Promise.resolve(0)
     ])
 
     return {
@@ -794,24 +745,56 @@ export class FuelRequestsService {
   }
 
   /**
+   * Stages that can be opened by a workflow role without a prior interaction.
+   * Keep this in sync with getFuelRequestById so list entries never lead to a
+   * detail view that the same user is not authorized to open.
+   */
+  private getWorkflowStatusesForRole(role: string): string[] | undefined {
+    const statusMap: Record<string, string[]> = {
+      TRANSPORT_OFFICER: [
+        'PENDING_TRANSPORT_APPROVAL',
+        'TRANSPORT_REJECTED',
+        'PENDING_DA_APPROVAL',
+        'ADA_REJECTED',
+        'FULLY_APPROVED',
+        'PENDING_FUEL_ISSUANCE',
+        'COMPLETED',
+        'CANCELLED',
+      ],
+      ADA_DAHRM: [
+        'PENDING_DA_APPROVAL',
+        'ADA_REJECTED',
+        'FULLY_APPROVED',
+        'PENDING_FUEL_ISSUANCE',
+        'COMPLETED',
+        'CANCELLED',
+      ],
+      PROCUREMENT: [
+        'FULLY_APPROVED',
+        'PENDING_FUEL_ISSUANCE',
+        'COMPLETED',
+        'CANCELLED',
+      ],
+    }
+    return statusMap[role]
+  }
+
+  /**
    * Get rejected statuses a role can see
    */
   private getRejectedStatusesForRole(role: string): string[] {
-    if (role === 'ADMIN') {
-      return ['HEAD_REJECTED', 'TRANSPORT_REJECTED', 'ADA_REJECTED', 'CANCELLED']
-    }
-    // For other roles, return all rejected statuses they can see based on authorization
-    return ['HEAD_REJECTED', 'TRANSPORT_REJECTED', 'ADA_REJECTED', 'CANCELLED']
+    const rejected = ['HEAD_REJECTED', 'TRANSPORT_REJECTED', 'ADA_REJECTED', 'CANCELLED']
+    const workflowStatuses = this.getWorkflowStatusesForRole(role)
+    return workflowStatuses ? rejected.filter(status => workflowStatuses.includes(status)) : rejected
   }
 
   /**
    * Get completed statuses a role can see
    */
   private getCompletedStatusesForRole(role: string): string[] {
-    if (role === 'ADMIN') {
-      return ['FULLY_APPROVED', 'COMPLETED']
-    }
-    return ['FULLY_APPROVED', 'COMPLETED']
+    const completed = ['FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE', 'COMPLETED']
+    const workflowStatuses = this.getWorkflowStatusesForRole(role)
+    return workflowStatuses ? completed.filter(status => workflowStatuses.includes(status)) : completed
   }
 }
 
