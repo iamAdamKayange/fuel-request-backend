@@ -691,14 +691,13 @@ export class FuelRequestsService {
   async getRoleStats(userId: string, role: string) {
     const where: any = {}
 
-    // Role-based base filtering - MUST match getFuelRequests logic exactly
+    // Role-based authorization filtering only (NO status restrictions for total count)
+    // This matches the all=true parameter in getFuelRequests
     if (role === 'ADMIN') {
-      // ADMIN sees all requests - no base filtering
-      // Keep where clause empty (no restrictions)
+      // ADMIN sees all requests - no restrictions
     } else if (role === 'DRIVER') {
       where.driverId = userId
-      // Driver sees all their own requests (same as getFuelRequests no-filter)
-      where.status = { in: ['PENDING_HEAD_APPROVAL', 'HEAD_REJECTED', 'PENDING_TRANSPORT_APPROVAL', 'TRANSPORT_REJECTED', 'PENDING_DA_APPROVAL', 'ADA_REJECTED', 'FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE', 'COMPLETED', 'CANCELLED'] }
+      // Driver sees all their own requests (no status filter for total)
     } else if (role === 'HEAD_OF_DEPARTMENT') {
       const user = await prisma.user.findUnique({
         where: { id: userId },
@@ -707,27 +706,24 @@ export class FuelRequestsService {
       if (user?.departmentId) {
         where.departmentId = user.departmentId
       }
-      // HoD sees only pending work (their stage) - same as getFuelRequests no-filter
-      where.status = 'PENDING_HEAD_APPROVAL'
+      // HoD sees all department requests (no status filter for total)
     } else if (role === 'TRANSPORT_OFFICER') {
-      // Transport Officer sees only pending work (their stage) - same as getFuelRequests no-filter
-      where.status = 'PENDING_TRANSPORT_APPROVAL'
+      // Transport Officer sees all requests (no status filter for total)
     } else if (role === 'ADA_DAHRM') {
-      // ADA sees only pending work (their stage) - same as getFuelRequests no-filter
-      where.status = 'PENDING_DA_APPROVAL'
+      // ADA sees all requests (no status filter for total)
     } else if (role === 'PROCUREMENT') {
       // PROCUREMENT sees fully approved, pending fuel issuance, completed, and rejected requests
-      // This matches getFuelRequests no-filter logic (lines 189-193)
+      // This is the only role with status restrictions even for total
       where.status = { in: ['FULLY_APPROVED', 'PENDING_FUEL_ISSUANCE', 'COMPLETED', 'ADA_REJECTED'] }
     }
 
-    // Get the pending status for this role
+    // Get the pending status for this role (for pending count)
     const pendingStatus = this.getPendingStatusForRole(role)
 
-    // Get rejected statuses this role can see
+    // Get rejected statuses this role can see (for rejected count)
     const rejectedStatuses = this.getRejectedStatusesForRole(role)
 
-    // Get completed statuses this role can see
+    // Get completed statuses this role can see (for completed count)
     const completedStatuses = this.getCompletedStatusesForRole(role)
 
     // Count by status - ALL counts must match getFuelRequests logic exactly
