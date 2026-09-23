@@ -1,0 +1,11 @@
+{
+  "$schema": "https://schema.railpack.com",
+  "steps": {
+    "install": {
+      "commands": ["npm ci"]
+    },
+    "build": {
+      "commands": ["...", "npm prune --omit=dev --ignore-scripts"]
+    }
+  }
+}

@@ -243,8 +243,14 @@ export class DocumentGenerationService {
       doc.fillColor('#000000')
 
       // Header and emblem follow the official paper form.
-      text('JAMHURI YA MUUNGANO WA TANZANIA', 130, 20, 330, true)
-      text('WIZARA YA HABARI, UTAMADUNI, SANAA NA MICHEZO', 103, 31, 385, true)
+      doc.font('Helvetica-Bold').fontSize(7.1).text('JAMHURI YA MUUNGANO WA TANZANIA', left, 20, {
+        width: right - left,
+        align: 'center',
+      })
+      doc.font('Helvetica-Bold').fontSize(7.1).text('WIZARA YA HABARI, UTAMADUNI, SANAA NA MICHEZO', left, 31, {
+        width: right - left,
+        align: 'center',
+      })
       text('Simu: +255 (026) - 2322129', left, 50, 150, true)
       text('Nukushi: +255 (026) - 2322126', left, 61, 150, true)
       text('Barua pepe: km@michezo.go.tz', left, 72, 150, true)
@@ -259,10 +265,11 @@ export class DocumentGenerationService {
         doc.image(emblemPath, 259, 47, { width: 57, height: 52 })
       }
 
-      const documentTitle = documentType === 'FUEL_PERMIT'
-        ? 'KIBALI CHA KUCHUKUA MAFUTA'
-        : 'TAARIFA YA MAFUTA'
-      text(documentTitle, 190, 108, 220, true)
+      // Both authorised print actions use the same official permit heading.
+      doc.font('Helvetica-Bold').fontSize(7.1).text('KIBALI CHA KUCHUKUA MAFUTA', left, 108, {
+        width: right - left,
+        align: 'center',
+      })
       doc.moveTo(190, 118).lineTo(407, 118).lineWidth(0.45).stroke()
 
       const head = approval('HEAD')

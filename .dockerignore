@@ -1,0 +1,19 @@
+# Local dependencies and build artefacts are recreated by Railpack.
+node_modules
+dist
+coverage
+
+# Credentials, repository metadata, editor settings, and local agent files are
+# never needed inside the production container.
+.env
+.env.*
+.git
+.github
+.agents
+.claude
+.windsurf
+
+# Local-only files
+*.log
+commit_msg.txt
+README.md
