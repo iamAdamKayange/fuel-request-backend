@@ -6,7 +6,6 @@
   "engines": {
     "node": "20.x"
   },
-  "packageManager": "npm@10.8.2",
   "scripts": {
     "dev": "nodemon",
     "build": "prisma generate --schema=src/prisma/schema.prisma && tsc",
